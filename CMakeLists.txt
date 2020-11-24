@@ -27,6 +27,7 @@ add_executable(WaterSurface
     ${SRC_DIR}Track.h
     ${SRC_DIR}TrainView.h
     ${SRC_DIR}TrainWindow.h
+	 ${SRC_DIR}Sphere.h
 
     ${SRC_DIR}main.cpp
     ${SRC_DIR}CallBacks.cpp
@@ -34,6 +35,7 @@ add_executable(WaterSurface
     ${SRC_DIR}Track.cpp
     ${SRC_DIR}TrainView.cpp
     ${SRC_DIR}TrainWindow.cpp
+	${SRC_DIR}Sphere.cpp
 
     ${SRC_SHADER}
     ${SRC_RENDER_UTILITIES}

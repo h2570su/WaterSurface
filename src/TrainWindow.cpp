@@ -107,9 +107,9 @@ TrainWindow(const int x, const int y)
 		splineBrowser = new Fl_Browser(605,pty,120,75,"Spline Type");
 		splineBrowser->type(2);		// select
 		splineBrowser->callback((Fl_Callback*)damageCB,this);
-		splineBrowser->add("Linear");
-		splineBrowser->add("Cardinal Cubic");
-		splineBrowser->add("Cubic B-Spline");
+		splineBrowser->add("None");
+		splineBrowser->add("Phong");
+		splineBrowser->add("Smooth");
 		splineBrowser->select(2);
 
 		pty += 110;
@@ -195,22 +195,7 @@ void TrainWindow::
 advanceTrain(float dir)
 //========================================================================
 {
-	//#####################################################################
-	// TODO: make this work for your train
-	//#####################################################################
-#ifdef EXAMPLE_SOLUTION
-	// note - we give a little bit more example code here than normal,
-	// so you can see how this works
-
-	if (arcLength->value()) {
-		float vel = ew.physics->value() ? physicsSpeed(this) : dir * (float)speed->value();
-		world.trainU += arclenVtoV(world.trainU, vel, this);
-	} else {
-		world.trainU +=  dir * ((float)speed->value() * .1f);
-	}
-
-	float nct = static_cast<float>(world.points.size());
-	if (world.trainU > nct) world.trainU -= nct;
-	if (world.trainU < 0) world.trainU += nct;
-#endif
+	this->trainView->lightBoxPos;
+	glm::mat4 rot = glm::rotate(1.0f*((float)this->speed->value()*0.05f)*dir, glm::vec3(1.0f, 0.0f, 0.0f));
+	this->trainView->lightBoxPos = rot * glm::vec4(this->trainView->lightBoxPos, 1.0f);
 }

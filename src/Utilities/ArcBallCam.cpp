@@ -63,6 +63,7 @@
 #include <Fl/Fl.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <glm/gtc/type_ptr.hpp>
 #include <Fl/Fl_Double_Window.h>
 #pragma warning(pop)
 
@@ -190,7 +191,7 @@ handle(int e)
 			};
 			break;
 		case FL_MOUSEWHEEL: {
-			float zamt = (Fl::event_dy() < 0) ? 1.1f : 1/1.1f;
+			float zamt = (Fl::event_dy() > 0) ? 1.1f : 1/1.1f;
 			eyeZ *= zamt;
 			wind->damage(1);
 			return 1;
@@ -254,6 +255,21 @@ getMatrix(HMatrix m) const
 	Quat qAll = now * start;
 	qAll = qAll.conjugate();   // since Ken does everything transposed
 	qAll.toMatrix(m);
+}
+glm::vec3  ArcBallCam::getEyePos()const
+{
+	HMatrix m;
+	Quat qAll = now * start;
+	qAll.x *= -1;
+	qAll.y *= -1;
+	qAll.z *= -1;
+	qAll = qAll.conjugate();   // since Ken does everything transposed
+	qAll.toMatrix(m);
+	glm::mat4 mm = glm::make_mat4((float*)m);
+	
+	glm::vec4 src = glm::vec4(this->eyeX, this->eyeY, this->eyeZ, 1.0f);
+	glm::vec4 ret = mm * src;
+	return glm::vec3(ret.x,ret.y,ret.z);
 }
 
 //**************************************************************************

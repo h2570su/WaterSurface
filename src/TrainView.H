@@ -29,6 +29,7 @@
 #include "RenderUtilities/BufferObject.h"
 #include "RenderUtilities/Shader.h"
 #include "RenderUtilities/Texture.h"
+#include "Sphere.h"
 
 // Preclarify for preventing the compiler error
 class TrainWindow;
@@ -59,6 +60,32 @@ class CTrack;
 // this uses the old ArcBall Code
 #include "Utilities/ArcBallCam.H"
 
+class mySphere
+{
+public:
+	 VAO* vao=nullptr;
+	 Texture2D* texture	= nullptr;
+	 glm::vec3 color3f;
+
+	 Sphere sp = Sphere(2.0f,1920,36,true);
+
+	 void draw(Shader* shader, glm::mat4 model);
+	 void generateVAO();
+};
+
+class aBox
+{
+public:
+	 VAO* vao=nullptr;
+	 Texture2D* texture	= nullptr;
+	 glm::vec3 color3f;
+
+	 
+
+	 void draw(Shader* shader, glm::mat4 model);
+	 void generateVAO();
+};
+
 class TrainView : public Fl_Gl_Window
 {
 	public:
@@ -85,7 +112,9 @@ class TrainView : public Fl_Gl_Window
 		void doPick();
 
 		//set ubo
-		void setUBO();
+		void setViewAndProjToUBO();
+
+		void setUseTexture(bool set);
 	public:
 		ArcBallCam		arcball;			// keep an ArcBall for the UI
 		int				selectedCube;  // simple - just remember which cube is selected
@@ -98,6 +127,7 @@ class TrainView : public Fl_Gl_Window
 		VAO* plane			= nullptr;
 		UBO* commom_matrices= nullptr;
 
+
 		//OpenAL
 		glm::vec3 source_pos;
 		glm::vec3 listener_pos;
@@ -106,5 +136,12 @@ class TrainView : public Fl_Gl_Window
 		ALuint source;
 		ALuint buffer;
 
+		aBox lightBox;
+		glm::vec3 lightBoxPos = glm::vec3(0, 100, 0);
 
+		static const int boxesAmount = 200;
+		aBox box;
+		glm::vec3 boxesPos[boxesAmount];
+		mySphere sphere;
 };
+

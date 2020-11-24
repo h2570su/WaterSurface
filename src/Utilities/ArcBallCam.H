@@ -49,7 +49,7 @@
 
 *************************************************************************/
 #pragma once
-
+#include <glm/glm.hpp>
 #include "3DUtils.H"
 
 //***************************************************************************
@@ -157,6 +157,7 @@ class ArcBallCam {
 
 		// this gets the global matrix (start and now)
 		void getMatrix(HMatrix) const;
+		glm::vec3 getEyePos()const;
 
 		// Spin the ball by some vector - if you don't understand
 		// how an arcball works, you probably don't care about this
