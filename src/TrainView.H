@@ -59,13 +59,14 @@ class CTrack;
 
 // this uses the old ArcBall Code
 #include "Utilities/ArcBallCam.H"
+#include <vector>
 
 class mySphere
 {
 public:
 	 VAO* vao=nullptr;
 	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f;
+	 glm::vec3 color3f = glm::vec3(0.0f, 0.5f, 0.5f);
 
 	 Sphere sp = Sphere(2.0f,1920,36,true);
 
@@ -79,6 +80,43 @@ public:
 	 VAO* vao=nullptr;
 	 Texture2D* texture	= nullptr;
 	 glm::vec3 color3f;
+
+	 
+
+	 void draw(Shader* shader, glm::mat4 model);
+	 void generateVAO();
+};
+
+class aPlane
+{
+	public:
+	VAO* vao=nullptr;
+	 Texture2D* texture	= nullptr;
+	 glm::vec3 color3f = glm::vec3(0.3f, 0.3f, 0.3f);
+
+	 
+
+	 void draw(Shader* shader, glm::mat4 model);
+	 void generateVAO();
+};
+class aSurface
+{
+	public:
+	VAO* vao=nullptr;
+	 Texture2D* texture	= nullptr;
+	 glm::vec3 color3f = glm::vec3(51.0/255, 204.0/255, 1.0);
+	 const int quadsAmount = 1600;
+	 
+
+	 void draw(Shader* shader, glm::mat4 model);
+	 void generateVAO();
+};
+class aBgPlane
+{
+	public:
+	VAO* vao=nullptr;
+	 Texture2D* texture	= nullptr;
+	 glm::vec3 color3f = glm::vec3(0.3f, 0.3f, 0.3f);
 
 	 
 
@@ -122,9 +160,23 @@ class TrainView : public Fl_Gl_Window
 		TrainWindow*	tw;				// The parent of this display window
 		CTrack*			m_pTrack;		// The track of the entire scene
 
-		Shader* shader		= nullptr;
+		Shader* simpleShader		= nullptr;
+		Shader* surfaceShader		= nullptr;
 		Texture2D* texture	= nullptr;
-		VAO* plane			= nullptr;
+		std::vector<Texture2D*> heightmap;
+		const int imgInterval = 1;
+		int imgCounter = 0;
+		int imgIdx = 0;
+		Texture2D* tile	= nullptr;
+
+		Texture2D* bg_top	= nullptr;
+		Texture2D* bg_bottom	= nullptr;
+		Texture2D* bg_right	= nullptr;
+		Texture2D* bg_left	= nullptr;
+		Texture2D* bg_front	= nullptr;
+		Texture2D* bg_back = nullptr;
+		
+		//VAO* plane			= nullptr;
 		UBO* commom_matrices= nullptr;
 
 
@@ -143,5 +195,9 @@ class TrainView : public Fl_Gl_Window
 		aBox box;
 		glm::vec3 boxesPos[boxesAmount];
 		mySphere sphere;
+
+		aPlane plane;
+		aSurface waterSurface;
+		aBgPlane bgPlane;
 };
 

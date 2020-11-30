@@ -38,7 +38,8 @@
 #include "TrainView.H"
 #include "TrainWindow.H"
 #include "Utilities/3DUtils.H"
-
+#include <sstream>
+#include <iomanip>
 
 
 #ifdef EXAMPLE_SOLUTION
@@ -172,6 +173,17 @@ int TrainView::handle(int event)
 	return Fl_Gl_Window::handle(event);
 }
 
+//From https://shengyu7697.github.io/blog/2020/04/27/Cpp-check-if-file-exists/
+
+bool fileExists(const std::string& path) {
+	FILE *fp;
+	if (fp = fopen(path.c_str(), "r")) {
+		fclose(fp);
+		return true;
+	}
+	return false;
+}
+
 //************************************************************************
 //
 // * this is the code that actually draws the window
@@ -190,12 +202,24 @@ void TrainView::draw()
 	{
 		//initiailize VAO, VBO, Shader...
 
-		if (!this->shader)
-			this->shader = new
-			Shader(
-				"../../src/shaders/simple.vert",
-				nullptr, nullptr, nullptr,
-				"../../src/shaders/simple.frag");
+		if (!this->simpleShader)
+		{
+			this->simpleShader = new
+				Shader(
+					"../../src/shaders/simple.vert",
+					nullptr, nullptr, nullptr,
+					"../../src/shaders/simple.frag");
+		}
+		if (!this->surfaceShader)
+		{
+			this->surfaceShader = new
+				Shader(
+					"../../src/shaders/forSurface.vert",
+					"../../src/shaders/forSurface.tesc",
+					"../../src/shaders/forSurface.tese",
+					nullptr,
+					"../../src/shaders/forSurface.frag");
+		}
 
 		if (!this->commom_matrices)
 			this->commom_matrices = new UBO();
@@ -208,76 +232,45 @@ void TrainView::draw()
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		if (!this->plane) {
-			GLfloat  vertices[] = {
-				-0.5f ,0.0f , -0.5f,
-				-0.5f ,0.0f , 0.5f ,
-				0.5f ,0.0f ,0.5f ,
-				0.5f ,0.0f ,-0.5f };
-			GLfloat  normal[] = {
-				0.0f, 1.0f, 0.0f,
-				0.0f, 1.0f, 0.0f,
-				0.0f, 1.0f, 0.0f,
-				0.0f, 1.0f, 0.0f };
-			GLfloat  texture_coordinate[] = {
-				0.0f, 0.0f,
-				1.0f, 0.0f,
-				1.0f, 1.0f,
-				0.0f, 1.0f };
-			GLuint element[] = {
-				0, 1, 2,
-				0, 2, 3, };
 
-			this->plane = new VAO;
-			this->plane->element_amount = sizeof(element) / sizeof(GLuint);
-			glGenVertexArrays(1, &this->plane->vao);
-			glGenBuffers(4, this->plane->vbo);
-			glGenBuffers(1, &this->plane->ebo);
-
-			glBindVertexArray(this->plane->vao);
-
-			// Position attribute
-			glBindBuffer(GL_ARRAY_BUFFER, this->plane->vbo[0]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-			glEnableVertexAttribArray(0);
-
-			// Normal attribute
-			glBindBuffer(GL_ARRAY_BUFFER, this->plane->vbo[1]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
-			glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-			glEnableVertexAttribArray(1);
-
-			// Texture Coordinate attribute
-			glBindBuffer(GL_ARRAY_BUFFER, this->plane->vbo[2]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
-			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-			glEnableVertexAttribArray(2);
-
-			// Color attribute
-			GLfloat* colorArr = new GLfloat[sizeof(vertices)];
-			for (int i = 0; i < sizeof(vertices) / sizeof(GLfloat); i += 3)
-			{
-				colorArr[i] = 0.3f;
-				colorArr[i + 1] = 0.3f;
-				colorArr[i + 2] = 0.3f;
-			}
-			glBindBuffer(GL_ARRAY_BUFFER, this->plane->vbo[3]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), colorArr, GL_STATIC_DRAW);
-			glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-			glEnableVertexAttribArray(3);
-			delete[] colorArr;
-
-			//Element attribute
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->plane->ebo);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
-
-			// Unbind VAO
-			glBindVertexArray(0);
-		}
 
 		if (!this->texture)
 			this->texture = new Texture2D("../../Images/church.png");
+
+		if (this->heightmap.empty())
+		{
+			for (int i = 0; i < 200; i++)
+			{
+				std::stringstream ss;
+				ss << std::setw(3) << std::setfill('0') << i;
+				std::string cnt = ss.str();
+				std::string str = "../../Images/waves/" + cnt + ".png";
+				if (fileExists(str))
+				{
+					this->heightmap.push_back(new Texture2D((str.c_str())));
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+
+		if (!this->tile)
+			this->tile = new Texture2D("../../Images/tiles.jpg");
+
+		if (!this->bg_back)
+			this->bg_back = new Texture2D("../../Images/skybox/back.jpg");
+		if (!this->bg_front)
+			this->bg_front = new Texture2D("../../Images/skybox/front.jpg");
+		if (!this->bg_top)
+			this->bg_top = new Texture2D("../../Images/skybox/top.jpg");
+		if (!this->bg_bottom)
+			this->bg_bottom = new Texture2D("../../Images/skybox/bottom.jpg");
+		if (!this->bg_right)
+			this->bg_right = new Texture2D("../../Images/skybox/right.jpg");
+		if (!this->bg_left)
+			this->bg_left = new Texture2D("../../Images/skybox/left.jpg");
 
 		if (!this->device) {
 			//Tutorial: https://ffainelli.github.io/openal-example/
@@ -429,7 +422,9 @@ void TrainView::draw()
 	// now draw the ground plane
 	//*********************************************************************
 	// set to opengl fixed pipeline(use opengl 1.x draw function)
+
 	glUseProgram(0);
+
 
 	/*setupFloor();
 	glDisable(GL_LIGHTING);
@@ -460,76 +455,121 @@ void TrainView::draw()
 
 
 	//bind shader
-	this->shader->Use();
+	this->simpleShader->Use();
+
+	//Background
+	if (true)
+	{
+		this->simpleShader->setInt("u_shadingSelect", 0); //0-No 1-Phong 2-Garudond	
+		glm::mat4 model_matrix = glm::mat4();
+		setUseTexture(true);
+
+		this->bg_front->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_front->unbind(0);
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+		this->bg_right->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_right->unbind(0);
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+		this->bg_back->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_back->unbind(0);
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+		this->bg_left->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_left->unbind(0);
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
+		model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+		this->bg_top->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_top->unbind(0);
+
+		model_matrix = glm::mat4(1);
+		model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+		model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+		this->bg_bottom->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		this->bgPlane.draw(this->simpleShader, model_matrix);
+		this->bg_bottom->unbind(0);
+	}
 
 	//Lighting------------------------------------------------
 
 
-	if (this->tw->splineBrowser->selected(2))
+	if (this->tw->shadingBrowser->selected(2))
 	{
-		this->shader->setInt("u_shadingSelect", 1); //0-No 1-Phong 2-Garudond
+		this->simpleShader->setInt("u_shadingSelect", 1); //0-No 1-Phong 2-Garudond
 	}
-	else if (this->tw->splineBrowser->selected(3))
+	else if (this->tw->shadingBrowser->selected(3))
 	{
-		this->shader->setInt("u_shadingSelect", 2); //0-No 1-Phong 2-Garudond
+		this->simpleShader->setInt("u_shadingSelect", 2); //0-No 1-Phong 2-Garudond
 	}
 	else
 	{
-		this->shader->setInt("u_shadingSelect", 0); //0-No 1-Phong 2-Garudond	
+		this->simpleShader->setInt("u_shadingSelect", 0); //0-No 1-Phong 2-Garudond	
 	}
-	this->shader->setVec3("u_viewer_pos", this->arcball.getEyePos());
+	this->simpleShader->setVec3("u_viewer_pos", this->arcball.getEyePos());
 
-	this->shader->setVec3("dirLights[0].direction", 0.0f, -1.0f, -1.0f);
-	this->shader->setVec3("dirLights[0].ambient", 0.2f, 0.2f, 0.2f);
-	this->shader->setVec3("dirLights[0].diffuse", 1.0f, 1.0f, 1.0f);
-	this->shader->setVec3("dirLights[0].specular", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setVec3("dirLights[0].direction", 0.0f, -1.0f, -1.0f);
+	this->simpleShader->setVec3("dirLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	this->simpleShader->setVec3("dirLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setVec3("dirLights[0].specular", 1.0f, 1.0f, 1.0f);
 
-	this->shader->setVec3("pointLights[0].position", this->lightBoxPos);
-	this->shader->setVec3("pointLights[0].ambient", 0.2f, 0.2f, 0.2f);
-	this->shader->setVec3("pointLights[0].diffuse", 1.0f, 1.0f, 1.0f);
-	this->shader->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-	this->shader->setFloat("pointLights[0].constant", 1.0f);
-	this->shader->setFloat("pointLights[0].linear", 0.01f);
-	this->shader->setFloat("pointLights[0].quadratic", 0.0001f);
+	this->simpleShader->setVec3("pointLights[0].position", this->lightBoxPos);
+	this->simpleShader->setVec3("pointLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	this->simpleShader->setVec3("pointLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setFloat("pointLights[0].constant", 1.0f);
+	this->simpleShader->setFloat("pointLights[0].linear", 0.01f);
+	this->simpleShader->setFloat("pointLights[0].quadratic", 0.0001f);
 
-	this->shader->setVec3("spotLights[0].position", this->arcball.getEyePos());
-	this->shader->setVec3("spotLights[0].ambient", 0.2f, 0.2f, 0.2f);
-	this->shader->setVec3("spotLights[0].diffuse", 1.0f, 1.0f, 1.0f);
-	this->shader->setVec3("spotLights[0].specular", 1.0f, 1.0f, 1.0f);
-	this->shader->setFloat("spotLights[0].constant", 1.0f);
-	this->shader->setFloat("spotLights[0].linear", 0);
-	this->shader->setFloat("spotLights[0].quadratic", 0);
-	this->shader->setVec3("spotLights[0].direction", -this->arcball.getEyePos());
-	this->shader->setFloat("spotLights[0].cutoff", glm::cos( glm::radians(10.0f)));
-	this->shader->setFloat("spotLights[0].outer_cutoff", glm::cos( glm::radians(15.0f)));
-	
+	this->simpleShader->setVec3("spotLights[0].position", this->arcball.getEyePos());
+	this->simpleShader->setVec3("spotLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	this->simpleShader->setVec3("spotLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setVec3("spotLights[0].specular", 1.0f, 1.0f, 1.0f);
+	this->simpleShader->setFloat("spotLights[0].constant", 1.0f);
+	this->simpleShader->setFloat("spotLights[0].linear", 0);
+	this->simpleShader->setFloat("spotLights[0].quadratic", 0);
+	this->simpleShader->setVec3("spotLights[0].direction", -this->arcball.getEyePos());
+	this->simpleShader->setFloat("spotLights[0].cutoff", glm::cos(glm::radians(10.0f)));
+	this->simpleShader->setFloat("spotLights[0].outer_cutoff", glm::cos(glm::radians(15.0f)));
+
 
 
 	//Lighting------------------------------------------------
 
+
+
+
+	//aPlane
 	glm::mat4 model_matrix = glm::mat4();
 	model_matrix = glm::translate(model_matrix, this->source_pos);
-	model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 10.0f, 200.0f));
-	glUniformMatrix4fv(glGetUniformLocation(this->shader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+	model_matrix = glm::scale(model_matrix, glm::vec3(10.0f, 10.0f, 10.0f));
 
 	this->texture->bind(0);
-	glUniform1i(glGetUniformLocation(this->shader->Program, "u_texture"), 0);
+	glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
 	setUseTexture(false);
 
-	//bind VAO
-	glBindVertexArray(this->plane->vao);
-
-	glDrawElements(GL_TRIANGLES, this->plane->element_amount, GL_UNSIGNED_INT, 0);
-
-	//unbind VAO
-	glBindVertexArray(0);
+	//this->plane.draw(this->simpleShader, model_matrix);
 
 	//Light Box
 	model_matrix = glm::mat4();
 	model_matrix = glm::translate(model_matrix, this->lightBoxPos);
 	model_matrix = glm::scale(model_matrix, glm::vec3(10.0f, 10.0f, 10.0f));
 	setUseTexture(false);
-	lightBox.draw(this->shader, model_matrix);
+	lightBox.draw(this->simpleShader, model_matrix);
 
 	//Sphere
 	model_matrix = glm::mat4();
@@ -537,7 +577,7 @@ void TrainView::draw()
 	model_matrix = glm::rotate(model_matrix, 90.0f, glm::vec3(1, 0, 0));
 	model_matrix = glm::scale(model_matrix, glm::vec3(10.0f, 10.0f, 10.0f));
 	setUseTexture(true);
-	sphere.draw(this->shader, model_matrix);
+	//sphere.draw(this->simpleShader, model_matrix);
 
 	//Boxes
 	for (int i = 0; i < boxesAmount; i++)
@@ -551,9 +591,144 @@ void TrainView::draw()
 		model_matrix = glm::rotate(model_matrix, 90.0f, glm::vec3(1, 0, 0));
 		model_matrix = glm::scale(model_matrix, glm::vec3(5.0f, 5.0f, 5.0f));
 		setUseTexture(true);
-		sphere.draw(this->shader, model_matrix);
+		//sphere.draw(this->simpleShader, model_matrix);
+	}
+	this->texture->unbind(0);
+
+
+	{
+		glm::mat4 model_matrix = glm::mat4();
+		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 100.0f, 1.0f));
+		model_matrix = glm::translate(model_matrix, glm::vec3(0, 0, -100));
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
+		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
+		this->tile->bind(0);
+		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
+		setUseTexture(true);
+
+		this->plane.draw(this->simpleShader, model_matrix);
+
+		model_matrix = glm::mat4();
+		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 100.0f, 1.0f));
+		model_matrix = glm::translate(model_matrix, glm::vec3(0, 0, 100));
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 1, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
+		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
+		this->plane.draw(this->simpleShader, model_matrix);
+
+		model_matrix = glm::mat4();
+		model_matrix = glm::scale(model_matrix, glm::vec3(1.0, 100.0f, 200.0f));
+		model_matrix = glm::translate(model_matrix, glm::vec3(-100, 0, 0));
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
+		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
+		this->plane.draw(this->simpleShader, model_matrix);
+
+		model_matrix = glm::mat4();
+		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 1.0f, 200.0f));
+		model_matrix = glm::translate(model_matrix, glm::vec3(0, -50, 0));
+
+		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
+		this->plane.draw(this->simpleShader, model_matrix);
+		this->tile->unbind(0);
 	}
 
+
+	//####################################################################################################
+	//Draw Surface unsing indepent shader
+	this->surfaceShader->Use();
+
+	//Lighting------------------------------------------------
+
+
+	if (this->tw->shadingBrowser->selected(2))
+	{
+		this->surfaceShader->setInt("u_shadingSelect", 1); //0-No 1-Phong 2-Garudond
+	}
+	else if (this->tw->shadingBrowser->selected(3))
+	{
+		this->surfaceShader->setInt("u_shadingSelect", 2); //0-No 1-Phong 2-Garudond
+	}
+	else
+	{
+		this->surfaceShader->setInt("u_shadingSelect", 0); //0-No 1-Phong 2-Garudond	
+	}
+	this->surfaceShader->setVec3("u_viewer_pos", this->arcball.getEyePos());
+
+	this->surfaceShader->setVec3("dirLights[0].direction", 0.0f, -1.0f, -1.0f);
+	this->surfaceShader->setVec3("dirLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	this->surfaceShader->setVec3("dirLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	this->surfaceShader->setVec3("dirLights[0].specular", 1.0f, 1.0f, 1.0f);
+
+	this->surfaceShader->setVec3("pointLights[0].position", this->lightBoxPos);
+	this->surfaceShader->setVec3("pointLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	this->surfaceShader->setVec3("pointLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	this->surfaceShader->setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+	this->surfaceShader->setFloat("pointLights[0].constant", 1.0f);
+	this->surfaceShader->setFloat("pointLights[0].linear", 0.01f);
+	this->surfaceShader->setFloat("pointLights[0].quadratic", 0.0001f);
+
+	//this->surfaceShader->setVec3("spotLights[0].position", this->arcball.getEyePos());
+	//this->surfaceShader->setVec3("spotLights[0].ambient", 0.2f, 0.2f, 0.2f);
+	//this->surfaceShader->setVec3("spotLights[0].diffuse", 1.0f, 1.0f, 1.0f);
+	//this->surfaceShader->setVec3("spotLights[0].specular", 1.0f, 1.0f, 1.0f);
+	//this->surfaceShader->setFloat("spotLights[0].constant", 1.0f);
+	//this->surfaceShader->setFloat("spotLights[0].linear", 0);
+	//this->surfaceShader->setFloat("spotLights[0].quadratic", 0);
+	//this->surfaceShader->setVec3("spotLights[0].direction", -this->arcball.getEyePos());
+	//this->surfaceShader->setFloat("spotLights[0].cutoff", glm::cos(glm::radians(10.0f)));
+	//this->surfaceShader->setFloat("spotLights[0].outer_cutoff", glm::cos(glm::radians(15.0f)));
+
+
+
+	//Lighting------------------------------------------------
+
+	//wave
+	this->surfaceShader->setVec2("u_direction", glm::vec2(1, -1));
+	this->surfaceShader->setFloat("u_time", this->m_pTrack->trainU);
+	this->surfaceShader->setFloat("u_wavelength", this->tw->waveLength->value());
+	this->surfaceShader->setFloat("u_amplitude", this->tw->amplitude->value());
+	if (this->tw->waveBrowser->selected(2))
+	{
+		this->surfaceShader->setInt("u_waveSelect", 1);
+	}
+	else
+	{
+		this->surfaceShader->setInt("u_waveSelect", 0);
+	}
+	if (imgCounter >= imgInterval)
+	{
+		imgCounter = 0;
+	}
+	else
+	{				
+		imgCounter++;
+	}
+	this->heightmap[imgIdx]->bind(2);
+		glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_heightmap"), 2);
+	
+	//wave
+	{
+		glm::mat4 model_matrix = glm::mat4();
+		model_matrix = glm::translate(model_matrix, this->source_pos);
+		model_matrix = glm::scale(model_matrix, glm::vec3(1.0f, 10.0f, 1.0f));
+		glUniformMatrix4fv(glGetUniformLocation(this->surfaceShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
+
+		this->surfaceShader->setBool("u_useTexture", false);
+		this->waterSurface.draw(this->surfaceShader, model_matrix);
+	}
+	this->heightmap[imgIdx]->unbind(2);
 	//unbind shader(switch to fixed pipeline)
 	glUseProgram(0);
 }
@@ -603,7 +778,7 @@ setProjection()
 #ifdef EXAMPLE_SOLUTION
 		trainCamView(this, aspect);
 #endif
-}
+	}
 }
 
 //************************************************************************
@@ -747,7 +922,7 @@ void TrainView::setUseTexture(bool set)
 	GLboolean to = set;
 	/*int u_useTextureLocation = glGetUniformLocation(this->shader->Program, "u_useTexture");
 	glUniform1i(u_useTextureLocation, to);*/
-	this->shader->setBool("u_useTexture", set);
+	this->simpleShader->setBool("u_useTexture", set);
 }
 
 void aBox::draw(Shader* shader, glm::mat4 model)
@@ -760,6 +935,8 @@ void aBox::draw(Shader* shader, glm::mat4 model)
 	glBindVertexArray(this->vao->vao);
 
 	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
 }
 
 void aBox::generateVAO()
@@ -955,12 +1132,12 @@ void mySphere::draw(Shader * shader, glm::mat4 model)
 	glBindVertexArray(this->vao->vao);
 
 	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
 }
 
 void mySphere::generateVAO()
 {
-
-
 	this->vao = new VAO;
 	this->vao->element_amount = this->sp.getIndexCount();
 	glGenVertexArrays(1, &this->vao->vao);
@@ -991,9 +1168,9 @@ void mySphere::generateVAO()
 	GLfloat* colorArr = new GLfloat[this->sp.getIndexCount() * 3];
 	for (int i = 0; i < this->sp.getIndexCount() * 3; i += 3)
 	{
-		colorArr[i] = 0.0f;
-		colorArr[i + 1] = 0.5f;
-		colorArr[i + 2] = 0.5f;
+		colorArr[i] = color3f.x;
+		colorArr[i + 1] = color3f.y;
+		colorArr[i + 2] = color3f.z;
 	}
 	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
 	glBufferData(GL_ARRAY_BUFFER, this->sp.getIndexCount() * 3, colorArr, GL_STATIC_DRAW);
@@ -1004,6 +1181,329 @@ void mySphere::generateVAO()
 	//Element attribute
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->sp.getIndexSize(), this->sp.getIndices(), GL_STATIC_DRAW);
+
+	// Unbind VAO
+	glBindVertexArray(0);
+}
+
+void aPlane::draw(Shader * shader, glm::mat4 model)
+{
+	if (this->vao == nullptr)
+	{
+		this->generateVAO();
+	}
+	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
+	glBindVertexArray(this->vao->vao);
+
+	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
+}
+
+void aPlane::generateVAO()
+{
+	GLfloat  vertices[] = {
+		-0.5f ,0.0f , -0.5f,
+		-0.5f ,0.0f , 0.5f ,
+		0.5f ,0.0f ,0.5f ,
+		0.5f ,0.0f ,-0.5f };
+	GLfloat  normal[] = {
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f };
+	GLfloat  texture_coordinate[] = {
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f };
+	GLuint element[] = {
+		0, 1, 2,
+		0 ,2, 3
+	};
+
+	this->vao = new VAO;
+	this->vao->element_amount = sizeof(element) / sizeof(GLuint);
+	glGenVertexArrays(1, &this->vao->vao);
+	glGenBuffers(4, this->vao->vbo);
+	glGenBuffers(1, &this->vao->ebo);
+
+	glBindVertexArray(this->vao->vao);
+
+	// Position attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	// Normal attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(1);
+
+	// Texture Coordinate attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(2);
+
+	// Color attribute
+	GLfloat* colorArr = new GLfloat[sizeof(vertices)];
+	for (int i = 0; i < sizeof(vertices) / sizeof(GLfloat); i += 3)
+	{
+		colorArr[i] = color3f.x;
+		colorArr[i + 1] = color3f.y;
+		colorArr[i + 2] = color3f.z;
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), colorArr, GL_STATIC_DRAW);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(3);
+	delete[] colorArr;
+
+	//Element attribute
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
+
+	// Unbind VAO
+	glBindVertexArray(0);
+
+}
+
+void aSurface::draw(Shader * shader, glm::mat4 model)
+{
+	if (this->vao == nullptr)
+	{
+		this->generateVAO();
+	}
+	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
+	glBindVertexArray(this->vao->vao);
+	glPatchParameteri(GL_PATCH_VERTICES, 3);
+	glDrawElements(GL_PATCHES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
+}
+
+void aSurface::generateVAO()
+{
+	GLfloat  sourceVertices[] = {
+		-100.0f ,0.0f , -100.0f,
+		-100.0f ,0.0f , 100.0f ,
+		100.0f ,0.0f ,100.0f ,
+		100.0f ,0.0f ,-100.0f };
+	GLfloat  sourceNormal[] = {
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f };
+	GLfloat  sourceTexture_coordinate[] = {
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f };
+	GLuint sourceElement[] = {
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	int quadLength = ceil(sqrt(this->quadsAmount));
+	vector<GLfloat> vertices;
+	vector<GLfloat> normal;
+	vector<GLfloat> texture_coordinate;
+	vector<GLint> element;
+
+	GLfloat VzInc = (sourceVertices[5] - sourceVertices[2]) / quadLength;
+	GLfloat VzStart = sourceVertices[2];
+	GLfloat VzCurr = VzStart;
+	GLfloat TyInc = 1.0f / quadLength;
+	GLfloat TyStart = 0.0f;
+	GLfloat TyCurr = TyStart;
+	for (int i = 0; i < quadLength; i++)
+	{
+		GLfloat VxInc = (sourceVertices[6] - sourceVertices[0]) / quadLength;
+		GLfloat VxStart = sourceVertices[0];
+		GLfloat VxCurr = VxStart;
+
+		GLfloat TxInc = 1.0f / quadLength;
+		GLfloat TxStart = 0.0f;
+		GLfloat TxCurr = TxStart;
+		for (int j = 0; j < quadLength; j++)
+		{
+			vertices.push_back(VxCurr);
+			vertices.push_back(sourceVertices[1]);
+			vertices.push_back(VzCurr);
+
+			vertices.push_back(VxCurr);
+			vertices.push_back(sourceVertices[4]);
+			vertices.push_back(VzCurr + VzInc);
+
+			vertices.push_back(VxCurr + VxInc);
+			vertices.push_back(sourceVertices[7]);
+			vertices.push_back(VzCurr + VzInc);
+
+			vertices.push_back(VxCurr + VxInc);
+			vertices.push_back(sourceVertices[10]);
+			vertices.push_back(VzCurr);
+			for (int k = 0; k < sizeof(sourceNormal) / sizeof(GLfloat); k++)
+			{
+				normal.push_back(sourceNormal[k]);
+			}
+
+			texture_coordinate.push_back(TxCurr);
+			texture_coordinate.push_back(TyCurr);
+
+			texture_coordinate.push_back(TxCurr);
+			texture_coordinate.push_back(TyCurr + TyInc);
+
+			texture_coordinate.push_back(TxCurr + TxInc);
+			texture_coordinate.push_back(TyCurr + TyInc);
+
+			texture_coordinate.push_back(TxCurr + TxInc);
+			texture_coordinate.push_back(TyCurr);
+
+			int idx = i * quadLength + j;
+			element.push_back(sourceElement[0] + (idx * 4));
+			element.push_back(sourceElement[1] + (idx * 4));
+			element.push_back(sourceElement[2] + (idx * 4));
+
+			element.push_back(sourceElement[3] + (idx * 4));
+			element.push_back(sourceElement[4] + (idx * 4));
+			element.push_back(sourceElement[5] + (idx * 4));
+
+			VxCurr += VxInc;
+			TxCurr += TxInc;
+		}
+		VzCurr += VzInc;
+		TyCurr += TyInc;
+	}
+
+
+	this->vao = new VAO;
+	this->vao->element_amount = element.size();
+	glGenVertexArrays(1, &this->vao->vao);
+	glGenBuffers(4, this->vao->vbo);
+	glGenBuffers(1, &this->vao->ebo);
+
+	glBindVertexArray(this->vao->vao);
+
+	// Position attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	// Normal attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, normal.size() * sizeof(GLfloat), normal.data(), GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(1);
+
+	// Texture Coordinate attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
+	glBufferData(GL_ARRAY_BUFFER, texture_coordinate.size() * sizeof(GLfloat), texture_coordinate.data(), GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(2);
+
+	// Color attribute
+	GLfloat* colorArr = new GLfloat[vertices.size() * sizeof(GLfloat)];
+	for (int i = 0; i < vertices.size(); i += 3)
+	{
+		colorArr[i] = color3f.x;
+		colorArr[i + 1] = color3f.y;
+		colorArr[i + 2] = color3f.z;
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), colorArr, GL_STATIC_DRAW);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(3);
+	delete[] colorArr;
+
+	//Element attribute
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, element.size() * sizeof(GLint), element.data(), GL_STATIC_DRAW);
+
+	// Unbind VAO
+	glBindVertexArray(0);
+}
+
+void aBgPlane::draw(Shader * shader, glm::mat4 model)
+{
+	if (this->vao == nullptr)
+	{
+		this->generateVAO();
+	}
+	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
+	glBindVertexArray(this->vao->vao);
+
+	glDrawElements(GL_QUADS, this->vao->element_amount, GL_UNSIGNED_INT, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
+}
+
+void aBgPlane::generateVAO()
+{
+	glBegin(GL_QUADS);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex4f(-1000, 1000, -1000, 1);
+
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex4f(1000, 1000, -1000, 1);
+
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex4f(1000, -1000, -1000, 1);
+
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex4f(-1000, -1000, -1000, 1);
+
+	glEnd();
+	GLfloat  vertices[] = {
+		-1000.0f ,1000.0f , -1000.0f,
+		 1000.0f ,1000.0f , -1000.0f ,
+		 1000.0f ,-1000.0f , -1000.0f,
+		-1000.0f ,-1000.0f , -1000.0f };
+	GLfloat  normal[] = {
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f };
+	GLfloat  texture_coordinate[] = {
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f };
+	GLuint element[] = {
+		0, 1, 2, 3
+	};
+	this->vao = new VAO;
+	this->vao->element_amount = sizeof(element) / sizeof(GLuint);
+	glGenVertexArrays(1, &this->vao->vao);
+	glGenBuffers(3, this->vao->vbo);
+	glGenBuffers(1, &this->vao->ebo);
+
+	glBindVertexArray(this->vao->vao);
+
+	// Position attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	// Normal attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(1);
+
+	// Texture Coordinate attribute
+	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(2);
+
+	//Element attribute
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
 
 	// Unbind VAO
 	glBindVertexArray(0);
