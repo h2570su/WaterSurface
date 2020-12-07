@@ -72,7 +72,7 @@ resetArcball()
 	// Set up the camera to look at the world
 	// these parameters might seem magical, and they kindof are
 	// a little trial and error goes a long way
-	arcball.setup(this, 40, 250, .2f, .4f, 0);
+	arcball.setup(this, 40, 250, .2f, 0, 0);
 }
 
 //************************************************************************
@@ -174,7 +174,6 @@ int TrainView::handle(int event)
 }
 
 //From https://shengyu7697.github.io/blog/2020/04/27/Cpp-check-if-file-exists/
-
 bool fileExists(const std::string& path) {
 	FILE *fp;
 	if (fp = fopen(path.c_str(), "r")) {
@@ -210,6 +209,14 @@ void TrainView::draw()
 					nullptr, nullptr, nullptr,
 					"../../src/shaders/simple.frag");
 		}
+		if (!this->backgroundShader)
+		{
+			this->backgroundShader = new
+				Shader(
+					"../../src/shaders/background.vert",
+					nullptr, nullptr, nullptr,
+					"../../src/shaders/background.frag");
+		}
 		if (!this->surfaceShader)
 		{
 			this->surfaceShader = new
@@ -222,16 +229,43 @@ void TrainView::draw()
 		}
 
 		if (!this->commom_matrices)
+		{
 			this->commom_matrices = new UBO();
-		this->commom_matrices->size = 2 * sizeof(glm::mat4);
+			this->commom_matrices->size = 2 * sizeof(glm::mat4);
 
-		glGenBuffers(1, &this->commom_matrices->ubo);
-		glBindBuffer(GL_UNIFORM_BUFFER, this->commom_matrices->ubo);
-		glBufferData(GL_UNIFORM_BUFFER, this->commom_matrices->size, NULL, GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+			glGenBuffers(1, &this->commom_matrices->ubo);
+			glBindBuffer(GL_UNIFORM_BUFFER, this->commom_matrices->ubo);
+			glBufferData(GL_UNIFORM_BUFFER, this->commom_matrices->size, NULL, GL_STATIC_DRAW);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
+			glGenTextures(1, &reflectTexture);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, reflectTexture);
+			glGenFramebuffers(6, fbo);
+			glGenRenderbuffers(6, rbo);
+			for (int i = 0; i < 6; i++)
+			{
+
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+
+
+				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, this->pixel_w(), this->pixel_h(),0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, reflectTexture, 0);
+
+				glBindRenderbuffer(GL_RENDERBUFFER, rbo[i]);
+				glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, this->pixel_w(), this->pixel_h());
+				glBindRenderbuffer(GL_RENDERBUFFER, 0);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo[i]);
+
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			}
+			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+		}
 
 
 		if (!this->texture)
@@ -259,18 +293,19 @@ void TrainView::draw()
 		if (!this->tile)
 			this->tile = new Texture2D("../../Images/tiles.jpg");
 
-		if (!this->bg_back)
-			this->bg_back = new Texture2D("../../Images/skybox/back.jpg");
-		if (!this->bg_front)
-			this->bg_front = new Texture2D("../../Images/skybox/front.jpg");
-		if (!this->bg_top)
-			this->bg_top = new Texture2D("../../Images/skybox/top.jpg");
-		if (!this->bg_bottom)
-			this->bg_bottom = new Texture2D("../../Images/skybox/bottom.jpg");
-		if (!this->bg_right)
-			this->bg_right = new Texture2D("../../Images/skybox/right.jpg");
-		if (!this->bg_left)
-			this->bg_left = new Texture2D("../../Images/skybox/left.jpg");
+		if (!this->background)
+		{
+			const char* paths[6] =
+			{
+				"../../Images/skybox/right.jpg",
+				"../../Images/skybox/left.jpg",
+				"../../Images/skybox/top.jpg",
+				"../../Images/skybox/bottom.jpg",
+				"../../Images/skybox/back.jpg",
+				"../../Images/skybox/front.jpg"
+			};
+			this->background = new TextureCube(paths);
+		}
 
 		if (!this->device) {
 			//Tutorial: https://ffainelli.github.io/openal-example/
@@ -329,10 +364,12 @@ void TrainView::draw()
 			//alcDestroyContext(context);
 			//alcCloseDevice(device);
 		}
+
 	}
 	else
 		throw std::runtime_error("Could not initialize GLAD!");
 
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// Set up the view port
 	glViewport(0, 0, w(), h());
 
@@ -451,59 +488,11 @@ void TrainView::draw()
 	glBindBufferRange(
 		GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
 
-
-
+	this->drawBackground();
 
 	//bind shader
 	this->simpleShader->Use();
-
-	//Background
-	if (true)
-	{
-		this->simpleShader->setInt("u_shadingSelect", 0); //0-No 1-Phong 2-Garudond	
-		glm::mat4 model_matrix = glm::mat4();
-		setUseTexture(true);
-
-		this->bg_front->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_front->unbind(0);
-
-		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
-		this->bg_right->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_right->unbind(0);
-
-		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
-		this->bg_back->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_back->unbind(0);
-
-		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
-		this->bg_left->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_left->unbind(0);
-
-		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
-
-		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
-		model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
-		this->bg_top->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_top->unbind(0);
-
-		model_matrix = glm::mat4(1);
-		model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-		model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
-		this->bg_bottom->bind(0);
-		glUniform1i(glGetUniformLocation(this->simpleShader->Program, "u_texture"), 0);
-		this->bgPlane.draw(this->simpleShader, model_matrix);
-		this->bg_bottom->unbind(0);
-	}
+#pragma region simpleShaderLight
 
 	//Lighting------------------------------------------------
 
@@ -515,6 +504,10 @@ void TrainView::draw()
 	else if (this->tw->shadingBrowser->selected(3))
 	{
 		this->simpleShader->setInt("u_shadingSelect", 2); //0-No 1-Phong 2-Garudond
+	}
+	else if (this->tw->shadingBrowser->selected(4))
+	{
+		this->simpleShader->setInt("u_shadingSelect", 3); //0-No 1-Phong 2-Garudond 3-Toon
 	}
 	else
 	{
@@ -546,13 +539,104 @@ void TrainView::draw()
 	this->simpleShader->setFloat("spotLights[0].cutoff", glm::cos(glm::radians(10.0f)));
 	this->simpleShader->setFloat("spotLights[0].outer_cutoff", glm::cos(glm::radians(15.0f)));
 
-
-
 	//Lighting------------------------------------------------
+#pragma endregion
+
+
+	this->simpleShaderDraw();
+
+
+#pragma region disposed
+
+
+
+	//glm::vec4 _plane = glm::vec4(0, 1, 0, glm::dot(glm::vec3(0, 1, 0), glm::vec3(0, 0, 0)));
+	//glm::mat4 reflectMat;
+	//reflectMat[0][0] = -2 * _plane.x*_plane.x + 1;
+	//reflectMat[0][1] = -2 * _plane.x * _plane.y;
+	//reflectMat[0][2] = -2 * _plane.x * _plane.z;
+	//reflectMat[0][3] = -2 * _plane.x * _plane.w;
+
+	//reflectMat[1][0] = -2 * _plane.x * _plane.y;
+	//reflectMat[1][1] = -2 * _plane.y * _plane.y + 1;
+	//reflectMat[1][2] = -2 * _plane.y * _plane.z;
+	//reflectMat[1][3] = -2 * _plane.y * _plane.w;
+
+	//reflectMat[2][0] = -2 * _plane.z * _plane.x;
+	//reflectMat[2][1] = -2 * _plane.z * _plane.y;
+	//reflectMat[2][2] = -2 * _plane.z * _plane.z + 1;
+
+	//reflectMat[3][0] = 0; reflectMat[3][1] = 0;
+	//reflectMat[3][2] = 0; reflectMat[3][3] = 1;
+	//
+	//float ang = atan2f(this->arcball.getEyePos().x, this->arcball.getEyePos().z);
+	//if (ang < 0)
+	//{
+	//	ang += 2 * 3.1415926;
+	//}
+	//std::cout << glm::degrees(ang)<<std::endl;
+
+	//glm::mat4 reflectCam;	
+	//glGetFloatv(GL_MODELVIEW_MATRIX, &reflectCam[0][0]);	
+	//reflectCam = ( reflectCam * glm::transpose(reflectMat));; //TODO wait for vaild
+	//glm::rotate(reflectCam, ang, glm::vec3(reflectCam[0], reflectCam[4], reflectCam[8]));
+
+
+	//auto CamPrime = glm::reflect(this->arcball.getEyePos(), glm::vec3(0, 1, 0));
+
+	//reflectCam = glm::lookAt(CamPrime, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+#pragma endregion
+	std::vector<glm::mat4> camMats =
+	{
+		glm::lookAt(glm::vec3(-100.0f, 0.0f, 0.0f), glm::vec3(100, 0, 0), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3( 100.0f, 0.0f, 0.0f), glm::vec3(-100, 0, 0), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3(0.0f, -100.0f, 0.0f), glm::vec3(0, 100, 0), glm::vec3(0, 0, 1)),
+		glm::lookAt(glm::vec3(0.0f,  100.0f, 0.0f), glm::vec3(0, -100, 0), glm::vec3(0, 0, -1)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, -100.0f), glm::vec3(0, 0, 100), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f,  100.0f), glm::vec3(0, 0, -100), glm::vec3(0, -1, 0))
+
+	};
+
+	glm::mat4 _projection_matrix = glm::perspective(90.0f, 1.0f, 100.0f, 1000.0f);
+	//glGetFloatv(GL_PROJECTION_MATRIX, &_projection_matrix[0][0]);
+	for (int i = 0; i < camMats.size(); i++)
+	{
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_DEPTH_TEST);
+
+		setViewAndProjToUBO(camMats[i], _projection_matrix);
+		glBindBufferRange(
+			GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
+		this->drawBackground(camMats[i], glm::perspective(90.0f, 1.0f, .01f, 1000.0f));
+		this->simpleShader->Use();
+		this->simpleShaderDraw();
+	}
 
 
 
 
+	//####################################################################################################
+	//Draw Surface unsing indepent shader
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	setViewAndProjToUBO();
+	glBindBufferRange(
+		GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
+	glActiveTexture(GL_TEXTURE0 + 11);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, this->reflectTexture);
+	this->drawSurface();
+
+	glActiveTexture(GL_TEXTURE0 + 11);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	//unbind shader(switch to fixed pipeline)
+	glUseProgram(0);
+
+}
+
+void TrainView::simpleShaderDraw()
+{
 	//aPlane
 	glm::mat4 model_matrix = glm::mat4();
 	model_matrix = glm::translate(model_matrix, this->source_pos);
@@ -577,7 +661,7 @@ void TrainView::draw()
 	model_matrix = glm::rotate(model_matrix, 90.0f, glm::vec3(1, 0, 0));
 	model_matrix = glm::scale(model_matrix, glm::vec3(10.0f, 10.0f, 10.0f));
 	setUseTexture(true);
-	//sphere.draw(this->simpleShader, model_matrix);
+	sphere.draw(this->simpleShader, model_matrix);
 
 	//Boxes
 	for (int i = 0; i < boxesAmount; i++)
@@ -596,6 +680,7 @@ void TrainView::draw()
 	this->texture->unbind(0);
 
 
+	if (true)
 	{
 		glm::mat4 model_matrix = glm::mat4();
 		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 100.0f, 1.0f));
@@ -642,11 +727,12 @@ void TrainView::draw()
 		this->plane.draw(this->simpleShader, model_matrix);
 		this->tile->unbind(0);
 	}
+}
 
-
-	//####################################################################################################
-	//Draw Surface unsing indepent shader
+void TrainView::drawSurface()
+{
 	this->surfaceShader->Use();
+#pragma region surfaceLighting
 
 	//Lighting------------------------------------------------
 
@@ -658,6 +744,10 @@ void TrainView::draw()
 	else if (this->tw->shadingBrowser->selected(3))
 	{
 		this->surfaceShader->setInt("u_shadingSelect", 2); //0-No 1-Phong 2-Garudond
+	}
+	else if (this->tw->shadingBrowser->selected(4))
+	{
+		this->surfaceShader->setInt("u_shadingSelect", 3); //0-No 1-Phong 2-Garudond 3-Toon
 	}
 	else
 	{
@@ -692,12 +782,19 @@ void TrainView::draw()
 
 
 	//Lighting------------------------------------------------
+#pragma endregion
+
+#pragma region surfaceDraw
 
 	//wave
+
+
 	this->surfaceShader->setVec2("u_direction", glm::vec2(1, -1));
 	this->surfaceShader->setFloat("u_time", this->m_pTrack->trainU);
 	this->surfaceShader->setFloat("u_wavelength", this->tw->waveLength->value());
 	this->surfaceShader->setFloat("u_amplitude", this->tw->amplitude->value());
+	this->surfaceShader->setBool("u_testNormal", this->tw->testButton->value());
+
 	if (this->tw->waveBrowser->selected(2))
 	{
 		this->surfaceShader->setInt("u_waveSelect", 1);
@@ -711,28 +808,83 @@ void TrainView::draw()
 		imgCounter = 0;
 	}
 	else
-	{				
+	{
 		imgCounter++;
 	}
 	this->heightmap[imgIdx]->bind(2);
-		glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_heightmap"), 2);
-	
+	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_heightmap"), 2);
+
+	this->background->bind(10);
+	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_skybox"), 10);
+
+
+	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_renderbox"), 11);
+
 	//wave
-	{
+	if (true) {
 		glm::mat4 model_matrix = glm::mat4();
 		model_matrix = glm::translate(model_matrix, this->source_pos);
 		model_matrix = glm::scale(model_matrix, glm::vec3(1.0f, 10.0f, 1.0f));
 		glUniformMatrix4fv(glGetUniformLocation(this->surfaceShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
-
+		this->texture->bind(0);
 
 		this->surfaceShader->setBool("u_useTexture", false);
 		this->waterSurface.draw(this->surfaceShader, model_matrix);
+		this->texture->unbind(0);
 	}
 	this->heightmap[imgIdx]->unbind(2);
-	//unbind shader(switch to fixed pipeline)
-	glUseProgram(0);
+	this->background->unbind(10);
+#pragma endregion
 }
 
+void TrainView::drawBackground(glm::mat4 view_matrix, glm::mat4 projection_matrix)
+{
+	//Background
+	this->backgroundShader->Use();
+	glDepthMask(false);
+	if (projection_matrix == glm::mat4())
+	{
+		glGetFloatv(GL_PROJECTION_MATRIX, &projection_matrix[0][0]);
+	}
+	glUniformMatrix4fv(glGetUniformLocation(this->backgroundShader->Program, "u_projection"), 1, GL_FALSE, &projection_matrix[0][0]);
+
+	if (view_matrix == glm::mat4())
+	{
+		glGetFloatv(GL_MODELVIEW_MATRIX, &view_matrix[0][0]);
+	}
+	view_matrix = glm::mat4(glm::mat3(view_matrix));
+	glUniformMatrix4fv(glGetUniformLocation(this->backgroundShader->Program, "u_view"), 1, GL_FALSE, &view_matrix[0][0]);
+
+	glm::mat4 model_matrix = glm::mat4();
+
+	this->background->bind(0);
+	glUniform1i(glGetUniformLocation(this->backgroundShader->Program, "u_skybox"), 0);
+
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+	model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
+	model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	model_matrix = glm::mat4(1);
+	model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+	model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+	this->bgPlane.draw(this->backgroundShader, model_matrix);
+
+	this->background->unbind(0);
+	glDepthMask(true);
+
+}
 //************************************************************************
 //
 // * This sets up both the Projection and the ModelView matrices
@@ -917,6 +1069,18 @@ void TrainView::setViewAndProjToUBO()
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
+void TrainView::setViewAndProjToUBO(glm::mat4 view_matrix, glm::mat4 projection_matrix)
+{
+	float wdt = this->pixel_w();
+	float hgt = this->pixel_h();
+
+
+	glBindBuffer(GL_UNIFORM_BUFFER, this->commom_matrices->ubo);
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), &projection_matrix[0][0]);
+	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), &view_matrix[0][0]);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
 void TrainView::setUseTexture(bool set)
 {
 	GLboolean to = set;
@@ -925,586 +1089,3 @@ void TrainView::setUseTexture(bool set)
 	this->simpleShader->setBool("u_useTexture", set);
 }
 
-void aBox::draw(Shader* shader, glm::mat4 model)
-{
-	if (this->vao == nullptr)
-	{
-		this->generateVAO();
-	}
-	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(this->vao->vao);
-
-	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aBox::generateVAO()
-{
-	GLfloat  vertices[] = {
-				-0.5f ,-0.5f , -0.5f,
-				-0.5f ,-0.5f ,  0.5f ,
-				 0.5f ,-0.5f ,  0.5f ,
-				 0.5f ,-0.5f , -0.5f,
-
-				-0.5f ,0.5f  , -0.5f,
-				-0.5f ,0.5f  ,  0.5f,
-				 0.5f ,0.5f  ,  0.5f ,
-				 0.5f ,0.5f  , -0.5f ,
-
-				 0.5f ,-0.5f  , -0.5f,
-				 0.5f ,-0.5f  ,  0.5f,
-				 0.5f , 0.5f  ,  0.5f ,
-				 0.5f , 0.5f  , -0.5f,
-
-				 -0.5f ,-0.5f  , -0.5f,
-				 -0.5f ,-0.5f  ,  0.5f,
-				 -0.5f , 0.5f  ,  0.5f ,
-				 -0.5f , 0.5f  , -0.5f,
-
-				 -0.5f ,-0.5f  , -0.5f,
-				 -0.5f , 0.5f  , -0.5f,
-				  0.5f , 0.5f  , -0.5f,
-				  0.5f ,-0.5f  , -0.5f,
-
-				  -0.5f ,-0.5f  , 0.5f,
-				 -0.5f , 0.5f  , 0.5f,
-				  0.5f , 0.5f  , 0.5f ,
-				  0.5f ,-0.5f  , 0.5f,
-
-	};
-	GLfloat  normal[] = {
-		0.0f, -1.0f, 0.0f,
-		0.0f, -1.0f, 0.0f,
-		0.0f, -1.0f, 0.0f,
-		0.0f, -1.0f, 0.0f,
-
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-
-		0.0f, 0.0f, -1.0f,
-		0.0f, 0.0f, -1.0f,
-		0.0f, 0.0f, -1.0f,
-		0.0f, 0.0f, -1.0f,
-
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-	};
-	GLfloat  texture_coordinate[] = {
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f
-
-	};
-	GLfloat  vertexColor[] = {
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-	};
-	GLuint element[] = {
-		0, 1, 2,//UP
-		0, 2, 3,
-		4, 5, 6,//DN
-		4, 6, 7,
-		8, 9, 10,//LEFT
-		8, 10, 11,
-		12, 13, 14,//RIGHT
-		12, 14, 15,
-		16, 17, 18,//BACK
-		16, 18, 19,
-		20, 21, 22,//FRONT
-		20, 22, 23
-	};
-
-	this->vao = new VAO;
-	this->vao->element_amount = sizeof(element) / sizeof(GLuint);
-	glGenVertexArrays(1, &this->vao->vao);
-	glGenBuffers(4, this->vao->vbo);
-	glGenBuffers(1, &this->vao->ebo);
-
-	glBindVertexArray(this->vao->vao);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-
-	// Normal attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(1);
-
-	// Texture Coordinate attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(2);
-
-	// Color attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexColor), vertexColor, GL_STATIC_DRAW);
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(3);
-
-	//Element attribute
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
-
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void mySphere::draw(Shader * shader, glm::mat4 model)
-{
-	if (this->vao == nullptr)
-	{
-		this->generateVAO();
-	}
-	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(this->vao->vao);
-
-	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void mySphere::generateVAO()
-{
-	this->vao = new VAO;
-	this->vao->element_amount = this->sp.getIndexCount();
-	glGenVertexArrays(1, &this->vao->vao);
-	glGenBuffers(4, this->vao->vbo);
-	glGenBuffers(1, &this->vao->ebo);
-
-	glBindVertexArray(this->vao->vao);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, this->sp.getVertexSize(), this->sp.getVertices(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-
-	// Normal attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, this->sp.getNormalSize(), this->sp.getNormals(), GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(1);
-
-	// Texture Coordinate attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
-	glBufferData(GL_ARRAY_BUFFER, this->sp.getTexCoordSize(), this->sp.getTexCoords(), GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(2);
-
-	// Color attribute
-	GLfloat* colorArr = new GLfloat[this->sp.getIndexCount() * 3];
-	for (int i = 0; i < this->sp.getIndexCount() * 3; i += 3)
-	{
-		colorArr[i] = color3f.x;
-		colorArr[i + 1] = color3f.y;
-		colorArr[i + 2] = color3f.z;
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
-	glBufferData(GL_ARRAY_BUFFER, this->sp.getIndexCount() * 3, colorArr, GL_STATIC_DRAW);
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(3);
-	delete[] colorArr;
-
-	//Element attribute
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->sp.getIndexSize(), this->sp.getIndices(), GL_STATIC_DRAW);
-
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aPlane::draw(Shader * shader, glm::mat4 model)
-{
-	if (this->vao == nullptr)
-	{
-		this->generateVAO();
-	}
-	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(this->vao->vao);
-
-	glDrawElements(GL_TRIANGLES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aPlane::generateVAO()
-{
-	GLfloat  vertices[] = {
-		-0.5f ,0.0f , -0.5f,
-		-0.5f ,0.0f , 0.5f ,
-		0.5f ,0.0f ,0.5f ,
-		0.5f ,0.0f ,-0.5f };
-	GLfloat  normal[] = {
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f };
-	GLfloat  texture_coordinate[] = {
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f };
-	GLuint element[] = {
-		0, 1, 2,
-		0 ,2, 3
-	};
-
-	this->vao = new VAO;
-	this->vao->element_amount = sizeof(element) / sizeof(GLuint);
-	glGenVertexArrays(1, &this->vao->vao);
-	glGenBuffers(4, this->vao->vbo);
-	glGenBuffers(1, &this->vao->ebo);
-
-	glBindVertexArray(this->vao->vao);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-
-	// Normal attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(1);
-
-	// Texture Coordinate attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(2);
-
-	// Color attribute
-	GLfloat* colorArr = new GLfloat[sizeof(vertices)];
-	for (int i = 0; i < sizeof(vertices) / sizeof(GLfloat); i += 3)
-	{
-		colorArr[i] = color3f.x;
-		colorArr[i + 1] = color3f.y;
-		colorArr[i + 2] = color3f.z;
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), colorArr, GL_STATIC_DRAW);
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(3);
-	delete[] colorArr;
-
-	//Element attribute
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
-
-	// Unbind VAO
-	glBindVertexArray(0);
-
-}
-
-void aSurface::draw(Shader * shader, glm::mat4 model)
-{
-	if (this->vao == nullptr)
-	{
-		this->generateVAO();
-	}
-	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(this->vao->vao);
-	glPatchParameteri(GL_PATCH_VERTICES, 3);
-	glDrawElements(GL_PATCHES, this->vao->element_amount, GL_UNSIGNED_INT, 0);
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aSurface::generateVAO()
-{
-	GLfloat  sourceVertices[] = {
-		-100.0f ,0.0f , -100.0f,
-		-100.0f ,0.0f , 100.0f ,
-		100.0f ,0.0f ,100.0f ,
-		100.0f ,0.0f ,-100.0f };
-	GLfloat  sourceNormal[] = {
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f };
-	GLfloat  sourceTexture_coordinate[] = {
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f };
-	GLuint sourceElement[] = {
-		0, 1, 2,
-		0, 2, 3
-	};
-
-	int quadLength = ceil(sqrt(this->quadsAmount));
-	vector<GLfloat> vertices;
-	vector<GLfloat> normal;
-	vector<GLfloat> texture_coordinate;
-	vector<GLint> element;
-
-	GLfloat VzInc = (sourceVertices[5] - sourceVertices[2]) / quadLength;
-	GLfloat VzStart = sourceVertices[2];
-	GLfloat VzCurr = VzStart;
-	GLfloat TyInc = 1.0f / quadLength;
-	GLfloat TyStart = 0.0f;
-	GLfloat TyCurr = TyStart;
-	for (int i = 0; i < quadLength; i++)
-	{
-		GLfloat VxInc = (sourceVertices[6] - sourceVertices[0]) / quadLength;
-		GLfloat VxStart = sourceVertices[0];
-		GLfloat VxCurr = VxStart;
-
-		GLfloat TxInc = 1.0f / quadLength;
-		GLfloat TxStart = 0.0f;
-		GLfloat TxCurr = TxStart;
-		for (int j = 0; j < quadLength; j++)
-		{
-			vertices.push_back(VxCurr);
-			vertices.push_back(sourceVertices[1]);
-			vertices.push_back(VzCurr);
-
-			vertices.push_back(VxCurr);
-			vertices.push_back(sourceVertices[4]);
-			vertices.push_back(VzCurr + VzInc);
-
-			vertices.push_back(VxCurr + VxInc);
-			vertices.push_back(sourceVertices[7]);
-			vertices.push_back(VzCurr + VzInc);
-
-			vertices.push_back(VxCurr + VxInc);
-			vertices.push_back(sourceVertices[10]);
-			vertices.push_back(VzCurr);
-			for (int k = 0; k < sizeof(sourceNormal) / sizeof(GLfloat); k++)
-			{
-				normal.push_back(sourceNormal[k]);
-			}
-
-			texture_coordinate.push_back(TxCurr);
-			texture_coordinate.push_back(TyCurr);
-
-			texture_coordinate.push_back(TxCurr);
-			texture_coordinate.push_back(TyCurr + TyInc);
-
-			texture_coordinate.push_back(TxCurr + TxInc);
-			texture_coordinate.push_back(TyCurr + TyInc);
-
-			texture_coordinate.push_back(TxCurr + TxInc);
-			texture_coordinate.push_back(TyCurr);
-
-			int idx = i * quadLength + j;
-			element.push_back(sourceElement[0] + (idx * 4));
-			element.push_back(sourceElement[1] + (idx * 4));
-			element.push_back(sourceElement[2] + (idx * 4));
-
-			element.push_back(sourceElement[3] + (idx * 4));
-			element.push_back(sourceElement[4] + (idx * 4));
-			element.push_back(sourceElement[5] + (idx * 4));
-
-			VxCurr += VxInc;
-			TxCurr += TxInc;
-		}
-		VzCurr += VzInc;
-		TyCurr += TyInc;
-	}
-
-
-	this->vao = new VAO;
-	this->vao->element_amount = element.size();
-	glGenVertexArrays(1, &this->vao->vao);
-	glGenBuffers(4, this->vao->vbo);
-	glGenBuffers(1, &this->vao->ebo);
-
-	glBindVertexArray(this->vao->vao);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-
-	// Normal attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, normal.size() * sizeof(GLfloat), normal.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(1);
-
-	// Texture Coordinate attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
-	glBufferData(GL_ARRAY_BUFFER, texture_coordinate.size() * sizeof(GLfloat), texture_coordinate.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(2);
-
-	// Color attribute
-	GLfloat* colorArr = new GLfloat[vertices.size() * sizeof(GLfloat)];
-	for (int i = 0; i < vertices.size(); i += 3)
-	{
-		colorArr[i] = color3f.x;
-		colorArr[i + 1] = color3f.y;
-		colorArr[i + 2] = color3f.z;
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[3]);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), colorArr, GL_STATIC_DRAW);
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(3);
-	delete[] colorArr;
-
-	//Element attribute
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, element.size() * sizeof(GLint), element.data(), GL_STATIC_DRAW);
-
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aBgPlane::draw(Shader * shader, glm::mat4 model)
-{
-	if (this->vao == nullptr)
-	{
-		this->generateVAO();
-	}
-	glUniformMatrix4fv(glGetUniformLocation(shader->Program, "u_model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(this->vao->vao);
-
-	glDrawElements(GL_QUADS, this->vao->element_amount, GL_UNSIGNED_INT, 0);
-	// Unbind VAO
-	glBindVertexArray(0);
-}
-
-void aBgPlane::generateVAO()
-{
-	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 1.0f);
-	glVertex4f(-1000, 1000, -1000, 1);
-
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex4f(1000, 1000, -1000, 1);
-
-	glTexCoord2f(1.0f, 0.0f);
-	glVertex4f(1000, -1000, -1000, 1);
-
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex4f(-1000, -1000, -1000, 1);
-
-	glEnd();
-	GLfloat  vertices[] = {
-		-1000.0f ,1000.0f , -1000.0f,
-		 1000.0f ,1000.0f , -1000.0f ,
-		 1000.0f ,-1000.0f , -1000.0f,
-		-1000.0f ,-1000.0f , -1000.0f };
-	GLfloat  normal[] = {
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f };
-	GLfloat  texture_coordinate[] = {
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f };
-	GLuint element[] = {
-		0, 1, 2, 3
-	};
-	this->vao = new VAO;
-	this->vao->element_amount = sizeof(element) / sizeof(GLuint);
-	glGenVertexArrays(1, &this->vao->vao);
-	glGenBuffers(3, this->vao->vbo);
-	glGenBuffers(1, &this->vao->ebo);
-
-	glBindVertexArray(this->vao->vao);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-
-	// Normal attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(normal), normal, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(1);
-
-	// Texture Coordinate attribute
-	glBindBuffer(GL_ARRAY_BUFFER, this->vao->vbo[2]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_coordinate), texture_coordinate, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(2);
-
-	//Element attribute
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->vao->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element), element, GL_STATIC_DRAW);
-
-	// Unbind VAO
-	glBindVertexArray(0);
-}

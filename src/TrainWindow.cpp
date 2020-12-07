@@ -123,6 +123,7 @@ TrainWindow(const int x, const int y)
 		shadingBrowser->add("None");
 		shadingBrowser->add("Phong");
 		shadingBrowser->add("Smooth");
+		shadingBrowser->add("Toon");
 		shadingBrowser->select(2);
 
 		waveBrowser = new Fl_Browser(700, pty, 90, 75, "Wave Type");
@@ -161,7 +162,9 @@ TrainWindow(const int x, const int y)
 		rzp->callback((Fl_Callback*)rmzCB, this);
 
 		pty += 30;
-
+		testButton = new Fl_Button(605, pty, 30, 20, "Test");
+		togglify(testButton);
+		testButton->callback((Fl_Callback*)damageCB, this);;
 		// TODO: add widgets for all of your fancier features here
 #ifdef EXAMPLE_SOLUTION
 		makeExampleWidgets(this, pty);
@@ -225,5 +228,5 @@ advanceTrain(float dir)
 	{
 		this->trainView->imgIdx = 0;
 	}
-	std::cout << "idx:" << this->trainView->imgIdx << std::endl;
+	//std::cout << "idx:" << this->trainView->imgIdx << std::endl;
 }

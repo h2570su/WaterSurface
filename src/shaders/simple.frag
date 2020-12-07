@@ -50,14 +50,23 @@ uniform  SpotLight spotLights[NR_SPOT_LIGHTS];
 uniform bool u_useTexture;
 uniform sampler2D u_texture;
 
+const float toonStage=3.0;
+
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 materialColor)
 {
     vec3 lightDir = normalize(-light.direction);
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
     // specular shading
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 halfwayDir  = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 64);
+
+	if(u_shadingSelect==3)
+	{
+		diff=floor(diff*toonStage)/toonStage;
+		spec=floor(spec*toonStage)/toonStage;
+		spec=0;
+	}
     // combine results
     vec3 ambient = light.ambient * materialColor;
     vec3 diffuse = light.diffuse * diff * materialColor;
@@ -71,8 +80,15 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, v
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
     // specular shading
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 halfwayDir  = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 64);
+
+	if(u_shadingSelect==3)
+	{
+		diff=floor(diff*toonStage)/toonStage;
+		spec=floor(spec*toonStage)/toonStage;
+		spec=0;
+	}
     // attenuation
     float distance    = length(light.position - fragPos);
 	light.constant=(light.constant==0.0f)?0.0000001f:light.constant;
@@ -94,8 +110,15 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
     // specular shading
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 halfwayDir  = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 64);
+
+	if(u_shadingSelect==3)
+	{
+		diff=floor(diff*toonStage)/toonStage;
+		spec=floor(spec*toonStage)/toonStage;
+		spec=0;
+	}
     // attenuation
 	light.constant=(light.constant==0.0f)?0.0000001f:light.constant;
     float distance = length(light.position - fragPos);
@@ -133,7 +156,7 @@ void main()
 	{
 		f_color = vec4(sourceColor, 1.0f);
 	}
-	else if(u_shadingSelect == 1)
+	else if(u_shadingSelect == 1||u_shadingSelect==3)
 	{
 		vec3 result = vec3(0,0,0);
 		vec3 _normal = normalize( o_normal);
@@ -156,4 +179,6 @@ void main()
 	{
 		f_color = vec4(o_color, 1.0f);
 	}
+
+
 }

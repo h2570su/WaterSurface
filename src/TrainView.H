@@ -29,6 +29,7 @@
 #include "RenderUtilities/BufferObject.h"
 #include "RenderUtilities/Shader.h"
 #include "RenderUtilities/Texture.h"
+#include "RenderUtilities/TextureCube.h"
 #include "Sphere.h"
 
 // Preclarify for preventing the compiler error
@@ -60,69 +61,8 @@ class CTrack;
 // this uses the old ArcBall Code
 #include "Utilities/ArcBallCam.H"
 #include <vector>
+#include "Object.H"
 
-class mySphere
-{
-public:
-	 VAO* vao=nullptr;
-	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f = glm::vec3(0.0f, 0.5f, 0.5f);
-
-	 Sphere sp = Sphere(2.0f,1920,36,true);
-
-	 void draw(Shader* shader, glm::mat4 model);
-	 void generateVAO();
-};
-
-class aBox
-{
-public:
-	 VAO* vao=nullptr;
-	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f;
-
-	 
-
-	 void draw(Shader* shader, glm::mat4 model);
-	 void generateVAO();
-};
-
-class aPlane
-{
-	public:
-	VAO* vao=nullptr;
-	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f = glm::vec3(0.3f, 0.3f, 0.3f);
-
-	 
-
-	 void draw(Shader* shader, glm::mat4 model);
-	 void generateVAO();
-};
-class aSurface
-{
-	public:
-	VAO* vao=nullptr;
-	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f = glm::vec3(51.0/255, 204.0/255, 1.0);
-	 const int quadsAmount = 1600;
-	 
-
-	 void draw(Shader* shader, glm::mat4 model);
-	 void generateVAO();
-};
-class aBgPlane
-{
-	public:
-	VAO* vao=nullptr;
-	 Texture2D* texture	= nullptr;
-	 glm::vec3 color3f = glm::vec3(0.3f, 0.3f, 0.3f);
-
-	 
-
-	 void draw(Shader* shader, glm::mat4 model);
-	 void generateVAO();
-};
 
 class TrainView : public Fl_Gl_Window
 {
@@ -133,6 +73,19 @@ class TrainView : public Fl_Gl_Window
 		// overrides of important window things
 		virtual int handle(int);
 		virtual void draw();
+
+		void simpleShaderDraw();
+
+		void drawSurface();
+
+		void drawBackground(glm::mat4 view_matrix = glm::mat4(), glm::mat4 projection_matrix = glm::mat4());
+
+		
+
+		
+		
+
+		
 
 		// all of the actual drawing happens in this routine
 		// it has to be encapsulated, since we draw differently if
@@ -152,6 +105,8 @@ class TrainView : public Fl_Gl_Window
 		//set ubo
 		void setViewAndProjToUBO();
 
+		void setViewAndProjToUBO(glm::mat4 view_matrix, glm::mat4 projection_matrix);
+
 		void setUseTexture(bool set);
 	public:
 		ArcBallCam		arcball;			// keep an ArcBall for the UI
@@ -161,6 +116,7 @@ class TrainView : public Fl_Gl_Window
 		CTrack*			m_pTrack;		// The track of the entire scene
 
 		Shader* simpleShader		= nullptr;
+		Shader* backgroundShader		= nullptr;
 		Shader* surfaceShader		= nullptr;
 		Texture2D* texture	= nullptr;
 		std::vector<Texture2D*> heightmap;
@@ -169,12 +125,10 @@ class TrainView : public Fl_Gl_Window
 		int imgIdx = 0;
 		Texture2D* tile	= nullptr;
 
-		Texture2D* bg_top	= nullptr;
-		Texture2D* bg_bottom	= nullptr;
-		Texture2D* bg_right	= nullptr;
-		Texture2D* bg_left	= nullptr;
-		Texture2D* bg_front	= nullptr;
-		Texture2D* bg_back = nullptr;
+		TextureCube* background	= nullptr;
+		GLuint fbo[6];
+		GLuint rbo[6];
+		GLuint reflectTexture;
 		
 		//VAO* plane			= nullptr;
 		UBO* commom_matrices= nullptr;
@@ -197,7 +151,7 @@ class TrainView : public Fl_Gl_Window
 		mySphere sphere;
 
 		aPlane plane;
-		aSurface waterSurface;
+		aSurface waterSurface = aSurface(1600);
 		aBgPlane bgPlane;
 };
 

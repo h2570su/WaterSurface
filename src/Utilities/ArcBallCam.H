@@ -173,6 +173,8 @@ class ArcBallCam {
 		// assume the window does it
 		void getMouseNDC(float& x, float& y);
 
+		float getFOV() { return this->fieldOfView; }
+
 	private:
 		// This keeps track of the rotation - the current rotation is
 		// start*now

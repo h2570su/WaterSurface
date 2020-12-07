@@ -18,7 +18,7 @@ uniform float u_wavelength;
 uniform float u_amplitude;
 uniform int u_waveSelect;
 uniform highp sampler2D u_heightmap;
-
+uniform bool u_testNormal;
 layout (std140, binding = 0) uniform commom_matrices
 {
     mat4 u_projection;
@@ -36,24 +36,68 @@ vec3 interpolate3D(vec3 v0, vec3 v1, vec3 v2)
     return vec3(gl_TessCoord.x) * v0 + vec3(gl_TessCoord.y) * v1 + vec3(gl_TessCoord.z) * v2;
 }
 
-void main()
+vec3 getHeightMapCoord(in vec2 heightmapCoord, in vec3 XandZ)
 {
-	f_in_texture_coordinate = interpolate2D(e_in_texture_coordinate[0], e_in_texture_coordinate[1], e_in_texture_coordinate[2]);
 	
-	f_in_position = interpolate3D(e_in_position[0], e_in_position[1],e_in_position[2]);
-	if(u_waveSelect==0)
-	{
-		f_in_position += vec3(0,u_amplitude,0)*sin((2*3.14)*(dot(u_direction ,f_in_texture_coordinate)+u_time)/u_wavelength);
-	}
-	else
-	{
-		vec2 heightmapCoord = f_in_texture_coordinate;
 		heightmapCoord+=u_direction*(u_time/20);
 		heightmapCoord/=(u_wavelength*8);		
 		heightmapCoord = heightmapCoord - (vec2(1,1) * floor(heightmapCoord.xy));
-		f_in_position += vec3(0,2*u_amplitude,0) *( vec3(texture(u_heightmap, heightmapCoord))-vec3(0,0.5,0));
+		XandZ.y= 2*u_amplitude *(texture(u_heightmap, heightmapCoord).r - 0.5);
+		return XandZ;
+}
+
+vec3 getSineCoord(in vec2 heightmapCoord, in vec3 XandZ)
+{
+		XandZ.y = u_amplitude * sin((2*3.14)*(dot(u_direction ,heightmapCoord)+u_time)/u_wavelength);
+		return XandZ;
+}
+float delta = 0.0001;
+vec3 getHeightMapNormal(in vec2 heightmapCoord, in vec3 XandZ)
+{	
+	vec3 source = getHeightMapCoord(heightmapCoord, XandZ);
+	vec3 dx = vec3(
+        delta*400,
+        getHeightMapCoord(vec2(heightmapCoord.x+delta,heightmapCoord.y), XandZ).y - getHeightMapCoord(vec2(heightmapCoord.x-delta,heightmapCoord.y), XandZ).y,
+        0.0);
+	vec3 dy = vec3(
+        0.0,
+        getHeightMapCoord(vec2(heightmapCoord.x,heightmapCoord.y+delta), XandZ).y - getHeightMapCoord(vec2(heightmapCoord.x,heightmapCoord.y-delta), XandZ).y,
+        -delta*400);
+
+	return normalize( cross(dy,dx));
+}
+
+vec3 getSineNormal(in vec2 heightmapCoord, in vec3 XandZ)
+{
+	vec3 source = getSineCoord(heightmapCoord, XandZ);
+	vec3 dx = vec3(
+        delta*400,
+        getSineCoord(vec2(heightmapCoord.x+delta,heightmapCoord.y), XandZ).y -  getSineCoord(vec2(heightmapCoord.x-delta,heightmapCoord.y), XandZ).y,
+        0.0);
+	vec3 dy = vec3(
+        0.0,
+        getSineCoord(vec2(heightmapCoord.x,heightmapCoord.y+delta), XandZ).y - getSineCoord(vec2(heightmapCoord.x,heightmapCoord.y-delta), XandZ).y,
+        -delta*400);
+
+	return normalize( cross(dy,dx));
+}
+
+void main()
+{
+	f_in_texture_coordinate = interpolate2D(e_in_texture_coordinate[0], e_in_texture_coordinate[1], e_in_texture_coordinate[2]);
+	f_in_color = interpolate3D(e_in_color[0], e_in_color[1], e_in_color[2]);
+	f_in_position = interpolate3D(e_in_position[0], e_in_position[1],e_in_position[2]);
+	if(u_waveSelect==0)
+	{
+		f_in_position = getSineCoord(f_in_texture_coordinate, f_in_position);
+		f_in_normal = getSineNormal(f_in_texture_coordinate, f_in_position);				
+	}
+	else
+	{		
+		f_in_position = getHeightMapCoord(f_in_texture_coordinate, f_in_position);
+		f_in_normal = getHeightMapNormal(f_in_texture_coordinate, f_in_position);		
 	}
 
-    f_in_color = interpolate3D(e_in_color[0], e_in_color[1],e_in_color[2]);
+    //f_in_color = interpolate3D(e_in_color[0], e_in_color[1],e_in_color[2]);
 	gl_Position =u_projection*u_view*vec4(f_in_position,1.0);
 }

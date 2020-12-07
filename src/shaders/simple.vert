@@ -135,7 +135,7 @@ void main()
     o_position = vec3(u_model * vec4(position, 1.0f));
     o_normal = mat3(transpose(inverse(u_model))) * normal;
     o_texture_coordinate = vec2(texture_coordinate.x, 1.0f - texture_coordinate.y);
-	if(u_shadingSelect==0||u_shadingSelect==1)
+	if(u_shadingSelect==0||u_shadingSelect==1||u_shadingSelect==3)
 	{
 		o_color = color;
 	}

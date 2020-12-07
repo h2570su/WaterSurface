@@ -12,7 +12,8 @@ set(SRC_SHADER
 set(SRC_RENDER_UTILITIES
     ${SRC_DIR}RenderUtilities/BufferObject.h
     ${SRC_DIR}RenderUtilities/Shader.h
-    ${SRC_DIR}RenderUtilities/Texture.h)
+    ${SRC_DIR}RenderUtilities/Texture.h
+	${SRC_DIR}RenderUtilities/TextureCube.h)
 
 include_directories(${INCLUDE_DIR})
 include_directories(${INCLUDE_DIR}glad4.6/include/)
@@ -32,6 +33,7 @@ add_executable(WaterSurface
     ${SRC_DIR}main.cpp
     ${SRC_DIR}CallBacks.cpp
     ${SRC_DIR}ControlPoint.cpp
+	${SRC_DIR}Object.cpp
     ${SRC_DIR}Track.cpp
     ${SRC_DIR}TrainView.cpp
     ${SRC_DIR}TrainWindow.cpp
