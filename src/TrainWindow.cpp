@@ -131,40 +131,27 @@ TrainWindow(const int x, const int y)
 		waveBrowser->callback((Fl_Callback*)damageCB, this);
 		waveBrowser->add("Sine");
 		waveBrowser->add("Height Map");
+		waveBrowser->add("Interactive");
 		waveBrowser->select(1);
 
 		pty += 110;
 
-		// add and delete points
-		Fl_Button* ap = new Fl_Button(605, pty, 80, 20, "Add Point");
-		ap->callback((Fl_Callback*)addPointCB, this);
-		Fl_Button* dp = new Fl_Button(690, pty, 80, 20, "Delete Point");
-		dp->callback((Fl_Callback*)deletePointCB, this);
-
-		pty += 25;
-		// reset the points
-		resetButton = new Fl_Button(735, pty, 60, 20, "Reset");
-		resetButton->callback((Fl_Callback*)resetCB, this);
-		Fl_Button* loadb = new Fl_Button(605, pty, 60, 20, "Load");
-		loadb->callback((Fl_Callback*)loadCB, this);
-		Fl_Button* saveb = new Fl_Button(670, pty, 60, 20, "Save");
-		saveb->callback((Fl_Callback*)saveCB, this);
-
-		pty += 25;
-		// roll the points
-		Fl_Button* rx = new Fl_Button(605, pty, 30, 20, "R+X");
-		rx->callback((Fl_Callback*)rpxCB, this);
-		Fl_Button* rxp = new Fl_Button(635, pty, 30, 20, "R-X");
-		rxp->callback((Fl_Callback*)rmxCB, this);
-		Fl_Button* rz = new Fl_Button(670, pty, 30, 20, "R+Z");
-		rz->callback((Fl_Callback*)rpzCB, this);
-		Fl_Button* rzp = new Fl_Button(700, pty, 30, 20, "R-Z");
-		rzp->callback((Fl_Callback*)rmzCB, this);
+		rain = new Fl_Button(605, pty, 30, 20, "Rain");
+		togglify(rain);
+		rain->callback((Fl_Callback*)damageCB, this);
 
 		pty += 30;
 		testButton = new Fl_Button(605, pty, 30, 20, "Test");
 		togglify(testButton);
-		testButton->callback((Fl_Callback*)damageCB, this);;
+		testButton->callback((Fl_Callback*)damageCB, this);
+
+		pty += 30;
+		testSlider = new Fl_Value_Slider(655, pty, 140, 20, "Tset");
+		testSlider->range(1, 180);
+		testSlider->value(90);
+		testSlider->align(FL_ALIGN_LEFT);
+		testSlider->type(FL_HORIZONTAL);
+		testSlider->callback((Fl_Callback*)damageCB, this);
 		// TODO: add widgets for all of your fancier features here
 #ifdef EXAMPLE_SOLUTION
 		makeExampleWidgets(this, pty);
@@ -228,5 +215,27 @@ advanceTrain(float dir)
 	{
 		this->trainView->imgIdx = 0;
 	}
-	//std::cout << "idx:" << this->trainView->imgIdx << std::endl;
+	while ((!this->trainView->drops.empty()) && this->m_Track.trainU - (*this->trainView->drops.begin()).first > 30.0f)
+	{
+		this->trainView->drops.erase(this->trainView->drops.begin());
+	}
+	static int rainDelay = 0;
+	if (rain->value())
+	{
+		rainDelay--;
+		if (rainDelay < 0)
+		{
+			rainDelay = (rand() % (int)(2000/(float)this->speed->value()) + 100) / 60;
+			if (this->trainView->drops.size() < 30)
+			{
+				this->trainView->drops[this->m_Track.trainU] = glm::vec2((rand() % 1000) / 1000.0, (rand() % 1000) / 1000.0);
+			}
+			else
+			{
+				this->trainView->drops.erase(this->trainView->drops.begin());
+			}
+		}
+	}
+
+	//std::cout << "Time:" << this->m_Track.trainU << std::endl;
 }

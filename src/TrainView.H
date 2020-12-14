@@ -61,6 +61,7 @@ class CTrack;
 // this uses the old ArcBall Code
 #include "Utilities/ArcBallCam.H"
 #include <vector>
+#include <map>
 #include "Object.H"
 
 
@@ -118,6 +119,8 @@ class TrainView : public Fl_Gl_Window
 		Shader* simpleShader		= nullptr;
 		Shader* backgroundShader		= nullptr;
 		Shader* surfaceShader		= nullptr;
+		Shader* pickShader = nullptr;
+
 		Texture2D* texture	= nullptr;
 		std::vector<Texture2D*> heightmap;
 		const int imgInterval = 1;
@@ -129,6 +132,12 @@ class TrainView : public Fl_Gl_Window
 		GLuint fbo[6];
 		GLuint rbo[6];
 		GLuint reflectTexture;
+
+		GLuint pickSurfaceBuffer;
+		GLuint pickSurfaceRenderBuffer;
+
+		std::map<float, glm::vec2> drops;
+		
 		
 		//VAO* plane			= nullptr;
 		UBO* commom_matrices= nullptr;

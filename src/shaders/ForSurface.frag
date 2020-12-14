@@ -170,15 +170,15 @@ void main()
 		vec3 viewDir = normalize(u_viewer_pos - f_in_position);
 		for(int i=0;i<NR_DIRECTIONAL_LIGHTS;i++)
 		{
-			result += CalcDirLight(dirLights[i], -_normal, viewDir, sourceColor);
+			result += CalcDirLight(dirLights[i], _normal, viewDir, sourceColor);
 		}
 		for(int i=0;i<NR_POINT_LIGHTS;i++)
 		{
-			result += CalcPointLight(pointLights[i], -_normal, f_in_position, viewDir, sourceColor);
+			result += CalcPointLight(pointLights[i], _normal, f_in_position, viewDir, sourceColor);
 		}
 		for(int i=0;i<NR_SPOT_LIGHTS;i++)
 		{
-			result += CalcSpotLight(spotLights[i], -_normal, f_in_position, viewDir, sourceColor);
+			result += CalcSpotLight(spotLights[i], _normal, f_in_position, viewDir, sourceColor);
 		}
 		vec4 baseColor = vec4(result, 1);
 
@@ -204,6 +204,7 @@ void main()
 			}
 			fresnel =1;
 			f_color = refractColor*(1-fresnel)+reflectColor*fresnel;
+			
 		}
 		else
 		{
@@ -213,23 +214,25 @@ void main()
 			vec4 reflectColor = texture(u_skybox, reflect(-viewDir, _normal));
 			vec4 refractColor ;
 			float fresnel = 0.0;
-			if((-viewDir).y>0)
+			if((-viewDir).y<0)
 			{
-				refractColor = texture(u_skybox, refract(viewDir, _normal,1.0/1.33));
-				fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(-_normal, -viewDir), _FresnelPower), 0.0, 1.0);
+				refractColor = texture(u_skybox, refract(viewDir, _normal, 1.0/1.33));
+				fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(_normal, viewDir), _FresnelPower), 0.0, 1.0);
 
 			}
 			else
 			{
-				refractColor = texture(u_skybox, refract(viewDir, -_normal,1.0/1.33));
-			    fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(_normal, -viewDir), _FresnelPower), 0.0, 1.0);
+				refractColor = texture(u_skybox, refract(viewDir, -_normal, 1.0/1.33));
+			    fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(-_normal, viewDir), _FresnelPower), 0.0, 1.0);
 
 			}
-			//fresnel =1;
+			//fresnel =0;
 			f_color = refractColor*(1-fresnel)+reflectColor*fresnel;
 			
 		}
+		//f_color = vec4(_normal,1);
 		//f_color = baseColor;
+		//f_color = vec4(f_in_texture_coordinate,0,1.0);
 	}
 	else 
 	{

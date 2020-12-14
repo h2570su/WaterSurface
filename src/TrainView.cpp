@@ -228,6 +228,14 @@ void TrainView::draw()
 					"../../src/shaders/forSurface.frag");
 		}
 
+		if (!this->pickShader)
+		{
+			this->pickShader = new Shader(
+				"../../src/shaders/pickSurface.vert",
+				nullptr, nullptr, nullptr,
+				"../../src/shaders/pickSurface.frag");
+		}
+
 		if (!this->commom_matrices)
 		{
 			this->commom_matrices = new UBO();
@@ -242,6 +250,7 @@ void TrainView::draw()
 
 			glGenTextures(1, &reflectTexture);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, reflectTexture);
+
 			glGenFramebuffers(6, fbo);
 			glGenRenderbuffers(6, rbo);
 			for (int i = 0; i < 6; i++)
@@ -250,7 +259,7 @@ void TrainView::draw()
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
 
 
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, this->pixel_w(), this->pixel_h(),0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, this->pixel_w(), this->pixel_h(), 0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
 				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -265,6 +274,17 @@ void TrainView::draw()
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+
+			glGenFramebuffers(1, &this->pickSurfaceBuffer);
+			glGenRenderbuffers(1, &this->pickSurfaceRenderBuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, this->pickSurfaceBuffer);
+			glBindRenderbuffer(GL_RENDERBUFFER, this->pickSurfaceRenderBuffer);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB8, this->pixel_w(), this->pixel_h());
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, this->pickSurfaceRenderBuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 		}
 
 
@@ -380,10 +400,10 @@ void TrainView::draw()
 	// it for shadows
 	glClearStencil(0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	glEnable(GL_DEPTH);
+
 
 	// Blayne prefers GL_DIFFUSE
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+	//glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
 	// prepare for projection
 	glMatrixMode(GL_PROJECTION);
@@ -588,29 +608,29 @@ void TrainView::draw()
 #pragma endregion
 	std::vector<glm::mat4> camMats =
 	{
-		glm::lookAt(glm::vec3(-100.0f, 0.0f, 0.0f), glm::vec3(100, 0, 0), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3( 100.0f, 0.0f, 0.0f), glm::vec3(-100, 0, 0), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3(0.0f, -100.0f, 0.0f), glm::vec3(0, 100, 0), glm::vec3(0, 0, 1)),
-		glm::lookAt(glm::vec3(0.0f,  100.0f, 0.0f), glm::vec3(0, -100, 0), glm::vec3(0, 0, -1)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, -100.0f), glm::vec3(0, 0, 100), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f,  100.0f), glm::vec3(0, 0, -100), glm::vec3(0, -1, 0))
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(100, 0, 0), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-100, 0, 0), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 100, 0), glm::vec3(0, 0, 1)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, -100, 0), glm::vec3(0, 0, -1)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 0, 100), glm::vec3(0, -1, 0)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 0, -100), glm::vec3(0, -1, 0))
 
 	};
 
-	glm::mat4 _projection_matrix = glm::perspective(90.0f, 1.0f, 100.0f, 1000.0f);
+	glm::mat4 _projection_matrix = glm::perspective<float>(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
 	//glGetFloatv(GL_PROJECTION_MATRIX, &_projection_matrix[0][0]);
 	for (int i = 0; i < camMats.size(); i++)
 	{
-		
+
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_DEPTH_TEST);
-
+		//camMats[i] = glm::scale(glm::vec3()) camMats[i]
 		setViewAndProjToUBO(camMats[i], _projection_matrix);
 		glBindBufferRange(
 			GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
-		this->drawBackground(camMats[i], glm::perspective(90.0f, 1.0f, .01f, 1000.0f));
+		this->drawBackground(camMats[i], _projection_matrix);
 		this->simpleShader->Use();
 		this->simpleShaderDraw();
 	}
@@ -631,6 +651,7 @@ void TrainView::draw()
 	glActiveTexture(GL_TEXTURE0 + 11);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	//unbind shader(switch to fixed pipeline)
+
 	glUseProgram(0);
 
 }
@@ -664,19 +685,19 @@ void TrainView::simpleShaderDraw()
 	sphere.draw(this->simpleShader, model_matrix);
 
 	//Boxes
-	for (int i = 0; i < boxesAmount; i++)
-	{
-		if (this->boxesPos[i] == glm::vec3())
-		{
-			this->boxesPos[i] = glm::vec3((rand() % 300) - 150, (rand() % 300) - 150, (rand() % 300) - 150);
-		}
-		model_matrix = glm::mat4();
-		model_matrix = glm::translate(model_matrix, this->boxesPos[i]);
-		model_matrix = glm::rotate(model_matrix, 90.0f, glm::vec3(1, 0, 0));
-		model_matrix = glm::scale(model_matrix, glm::vec3(5.0f, 5.0f, 5.0f));
-		setUseTexture(true);
-		//sphere.draw(this->simpleShader, model_matrix);
-	}
+	//for (int i = 0; i < boxesAmount; i++)
+	//{
+	//	if (this->boxesPos[i] == glm::vec3())
+	//	{
+	//		this->boxesPos[i] = glm::vec3((rand() % 300) - 150, (rand() % 300) - 150, (rand() % 300) - 150);
+	//	}
+	//	model_matrix = glm::mat4();
+	//	model_matrix = glm::translate(model_matrix, this->boxesPos[i]);
+	//	model_matrix = glm::rotate(model_matrix, 90.0f, glm::vec3(1, 0, 0));
+	//	model_matrix = glm::scale(model_matrix, glm::vec3(5.0f, 5.0f, 5.0f));
+	//	setUseTexture(true);
+	//	//sphere.draw(this->simpleShader, model_matrix);
+	//}
 	this->texture->unbind(0);
 
 
@@ -799,6 +820,10 @@ void TrainView::drawSurface()
 	{
 		this->surfaceShader->setInt("u_waveSelect", 1);
 	}
+	else if (this->tw->waveBrowser->selected(3))
+	{
+		this->surfaceShader->setInt("u_waveSelect", 2);
+	}
 	else
 	{
 		this->surfaceShader->setInt("u_waveSelect", 0);
@@ -820,21 +845,38 @@ void TrainView::drawSurface()
 
 	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_renderbox"), 11);
 
-	//wave
-	if (true) {
-		glm::mat4 model_matrix = glm::mat4();
-		model_matrix = glm::translate(model_matrix, this->source_pos);
-		model_matrix = glm::scale(model_matrix, glm::vec3(1.0f, 10.0f, 1.0f));
-		glUniformMatrix4fv(glGetUniformLocation(this->surfaceShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
-		this->texture->bind(0);
-
-		this->surfaceShader->setBool("u_useTexture", false);
-		this->waterSurface.draw(this->surfaceShader, model_matrix);
-		this->texture->unbind(0);
+	int dropIdx = 0;
+	for (auto& v : this->drops)
+	{
+		this->surfaceShader->setFloat("u_dropTime[" + std::to_string(dropIdx) + "]", (v.first == 0.0f) ? 0.0001 : v.first);
+		this->surfaceShader->setVec2("u_drop[" + std::to_string(dropIdx) + "]", v.second);
+		dropIdx++;
+		if (dropIdx >= 100)
+		{
+			break;
+		}
 	}
+	if (dropIdx < 100)
+	{
+		this->surfaceShader->setFloat("u_dropTime[" + std::to_string(dropIdx) + "]", 0);
+	}
+
+	//wave
+
+	glm::mat4 model_matrix = glm::mat4();
+	model_matrix = glm::scale(model_matrix, glm::vec3(1.0f, 10.0f, 1.0f));
+	glUniformMatrix4fv(glGetUniformLocation(this->surfaceShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+	this->texture->bind(0);
+
+	this->surfaceShader->setBool("u_useTexture", false);
+	this->waterSurface.draw(this->surfaceShader, model_matrix);
+	this->texture->unbind(0);
+
 	this->heightmap[imgIdx]->unbind(2);
 	this->background->unbind(10);
 #pragma endregion
+
+
 }
 
 void TrainView::drawBackground(glm::mat4 view_matrix, glm::mat4 projection_matrix)
@@ -999,54 +1041,81 @@ void TrainView::
 doPick()
 //========================================================================
 {
-	// since we'll need to do some GL stuff so we make this window as 
-	// active window
-	make_current();
+	//// since we'll need to do some GL stuff so we make this window as 
+	//// active window
+	//make_current();
 
-	// where is the mouse?
-	int mx = Fl::event_x();
-	int my = Fl::event_y();
+	//// where is the mouse?
+	//int mx = Fl::event_x();
+	//int my = Fl::event_y();
 
-	// get the viewport - most reliable way to turn mouse coords into GL coords
-	int viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
+	//// get the viewport - most reliable way to turn mouse coords into GL coords
+	//int viewport[4];
+	//glGetIntegerv(GL_VIEWPORT, viewport);
 
-	// Set up the pick matrix on the stack - remember, FlTk is
-	// upside down!
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPickMatrix((double)mx, (double)(viewport[3] - my),
-		5, 5, viewport);
+	//// Set up the pick matrix on the stack - remember, FlTk is
+	//// upside down!
+	//glMatrixMode(GL_PROJECTION);
+	//glLoadIdentity();
+	//gluPickMatrix((double)mx, (double)(viewport[3] - my),
+	//	5, 5, viewport);
 
-	// now set up the projection
-	setProjection();
+	//// now set up the projection
+	//setProjection();
 
-	// now draw the objects - but really only see what we hit
-	GLuint buf[100];
-	glSelectBuffer(100, buf);
-	glRenderMode(GL_SELECT);
-	glInitNames();
-	glPushName(0);
+	//// now draw the objects - but really only see what we hit
+	//GLuint buf[100];
+	//glSelectBuffer(100, buf);
+	//glRenderMode(GL_SELECT);
+	//glInitNames();
+	//glPushName(0);
 
-	// draw the cubes, loading the names as we go
-	for (size_t i = 0; i < m_pTrack->points.size(); ++i) {
-		glLoadName((GLuint)(i + 1));
-		m_pTrack->points[i].draw();
+	//// draw the cubes, loading the names as we go
+	//for (size_t i = 0; i < m_pTrack->points.size(); ++i) {
+	//	glLoadName((GLuint)(i + 1));
+	//	m_pTrack->points[i].draw();
+	//}
+
+	//// go back to drawing mode, and see how picking did
+	//int hits = glRenderMode(GL_RENDER);
+	//if (hits) {
+	//	// warning; this just grabs the first object hit - if there
+	//	// are multiple objects, you really want to pick the closest
+	//	// one - see the OpenGL manual 
+	//	// remember: we load names that are one more than the index
+	//	selectedCube = buf[3] - 1;
+	//}
+	//else // nothing hit, nothing selected
+	//	selectedCube = -1;
+
+	//printf("Selected Cube %d\n", selectedCube);
+	if (this->tw->waveBrowser->selected(3))
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, this->pickSurfaceBuffer);
+		glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		this->pickShader->Use();
+		//this->pickShader->setMat4("u_model", model_matrix);
+		this->plane.draw(this->pickShader, glm::scale(glm::vec3(200, 1, 200)));
+
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glm::vec3 picker;
+		int viewport[4];
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		int mx = Fl::event_x();
+		int my = viewport[3] - Fl::event_y();
+		glReadPixels(mx, my, 1, 1, GL_RGB, GL_FLOAT, &picker[0]);
+		glReadBuffer(GL_NONE);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		if (picker.b != 1.0f)
+		{
+			std::cout << "Selecting: " + std::to_string(picker.x) + ", " + std::to_string(picker.y) << std::endl;
+		}
+		this->drops[this->m_pTrack->trainU] = glm::vec2(picker.x, picker.y);
+
 	}
 
-	// go back to drawing mode, and see how picking did
-	int hits = glRenderMode(GL_RENDER);
-	if (hits) {
-		// warning; this just grabs the first object hit - if there
-		// are multiple objects, you really want to pick the closest
-		// one - see the OpenGL manual 
-		// remember: we load names that are one more than the index
-		selectedCube = buf[3] - 1;
-	}
-	else // nothing hit, nothing selected
-		selectedCube = -1;
-
-	printf("Selected Cube %d\n", selectedCube);
 }
 
 void TrainView::setViewAndProjToUBO()
