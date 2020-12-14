@@ -120,6 +120,7 @@ class TrainView : public Fl_Gl_Window
 		Shader* backgroundShader		= nullptr;
 		Shader* surfaceShader		= nullptr;
 		Shader* pickShader = nullptr;
+		Shader* postProcessShader = nullptr;
 
 		Texture2D* texture	= nullptr;
 		std::vector<Texture2D*> heightmap;
@@ -135,6 +136,10 @@ class TrainView : public Fl_Gl_Window
 
 		GLuint pickSurfaceBuffer;
 		GLuint pickSurfaceRenderBuffer;
+
+		GLuint frameFBO;
+		GLuint frameTexture;
+		GLuint frameDepthRBO;
 
 		std::map<float, glm::vec2> drops;
 		

@@ -236,6 +236,14 @@ void TrainView::draw()
 				"../../src/shaders/pickSurface.frag");
 		}
 
+		if (!this->postProcessShader)
+		{
+			this->postProcessShader = new Shader(
+				"../../src/shaders/postProcess.vert",
+				nullptr, nullptr, nullptr,
+				"../../src/shaders/postProcess.frag");
+		}
+
 		if (!this->commom_matrices)
 		{
 			this->commom_matrices = new UBO();
@@ -285,6 +293,28 @@ void TrainView::draw()
 			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, this->pickSurfaceRenderBuffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+
+			glGenTextures(1, &frameTexture);
+			glBindTexture(GL_TEXTURE_2D, frameTexture);
+			glGenFramebuffers(1, &this->frameFBO);
+			glGenRenderbuffers(1, &this->frameDepthRBO);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, this->frameFBO);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, this->pixel_w(), this->pixel_h(), 0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameTexture, 0);
+
+			glBindRenderbuffer(GL_RENDERBUFFER, this->frameDepthRBO);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, this->pixel_w(), this->pixel_h());
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, this->frameDepthRBO);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 
 
@@ -389,7 +419,7 @@ void TrainView::draw()
 	else
 		throw std::runtime_error("Could not initialize GLAD!");
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, this->frameFBO);
 	// Set up the view port
 	glViewport(0, 0, w(), h());
 
@@ -640,7 +670,7 @@ void TrainView::draw()
 
 	//####################################################################################################
 	//Draw Surface unsing indepent shader
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, this->frameFBO);
 	setViewAndProjToUBO();
 	glBindBufferRange(
 		GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
@@ -652,6 +682,31 @@ void TrainView::draw()
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	//unbind shader(switch to fixed pipeline)
 
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClearColor(0, 0, .3f, 0);		// background should be blue
+
+	// we need to clear out the stencil buffer since we'll use
+	// it for shadows
+	glClearStencil(0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	this->postProcessShader->Use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, this->frameTexture);
+	this->postProcessShader->setInt("u_frame", 0);
+	GLuint effects = 0;
+	if (this->tw->pixelation->value())
+	{
+		effects |= 0x01;
+	}
+	this->postProcessShader->setInt("u_effect", effects);
+	if (true)
+	{
+		this->bgPlane.draw(this->postProcessShader, glm::mat4());
+
+	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glUseProgram(0);
 
 }
@@ -703,6 +758,9 @@ void TrainView::simpleShaderDraw()
 
 	if (true)
 	{
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
 		glm::mat4 model_matrix = glm::mat4();
 		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 100.0f, 1.0f));
 		model_matrix = glm::translate(model_matrix, glm::vec3(0, 0, -100));
@@ -737,6 +795,19 @@ void TrainView::simpleShaderDraw()
 		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
 		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
 
+
+
+		this->plane.draw(this->simpleShader, model_matrix);
+
+		model_matrix = glm::mat4();
+		model_matrix = glm::scale(model_matrix, glm::vec3(1.0, 100.0f, 200.0f));
+		model_matrix = glm::translate(model_matrix, glm::vec3(100, 0, 0));
+
+		model_matrix = glm::rotate(model_matrix, glm::radians(90.0f), glm::vec3(0, 1, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));;
+		model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(0, 1, 0));;
+		glUniformMatrix4fv(glGetUniformLocation(this->simpleShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
+
 		this->plane.draw(this->simpleShader, model_matrix);
 
 		model_matrix = glm::mat4();
@@ -747,6 +818,7 @@ void TrainView::simpleShaderDraw()
 
 		this->plane.draw(this->simpleShader, model_matrix);
 		this->tile->unbind(0);
+		glDisable(GL_CULL_FACE);
 	}
 }
 
@@ -953,7 +1025,7 @@ setProjection()
 		else {
 			he = 110;
 			wi = he * aspect;
-		}
+	}
 
 		// Set up the top camera drop mode to be orthogonal and set
 		// up proper projection matrix
@@ -962,7 +1034,7 @@ setProjection()
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		glRotatef(-90, 1, 0, 0);
-	}
+}
 	// Or do the train view or other view here
 	//####################################################################
 	// TODO: 
@@ -1023,7 +1095,7 @@ void TrainView::drawStuff(bool doingShadows)
 	if (!tw->trainCam->value())
 		drawTrain(this, doingShadows);
 #endif
-}
+			}
 
 // 
 //************************************************************************
@@ -1111,8 +1183,9 @@ doPick()
 		if (picker.b != 1.0f)
 		{
 			std::cout << "Selecting: " + std::to_string(picker.x) + ", " + std::to_string(picker.y) << std::endl;
+			this->drops[this->m_pTrack->trainU] = glm::vec2(picker.x, picker.y);
 		}
-		this->drops[this->m_pTrack->trainU] = glm::vec2(picker.x, picker.y);
+		
 
 	}
 

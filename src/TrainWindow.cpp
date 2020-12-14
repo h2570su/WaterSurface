@@ -136,9 +136,15 @@ TrainWindow(const int x, const int y)
 
 		pty += 110;
 
-		rain = new Fl_Button(605, pty, 30, 20, "Rain");
+		rain = new Fl_Button(605, pty, 60, 20, "Rain");
 		togglify(rain);
 		rain->callback((Fl_Callback*)damageCB, this);
+
+		pty += 30;
+
+		pixelation = new Fl_Button(605, pty, 60, 20, "Pixel");
+		togglify(pixelation);
+		pixelation->callback((Fl_Callback*)damageCB, this);
 
 		pty += 30;
 		testButton = new Fl_Button(605, pty, 30, 20, "Test");

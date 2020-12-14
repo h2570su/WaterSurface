@@ -92,6 +92,9 @@ class TrainWindow : public Fl_Double_Window {
 		Fl_Value_Slider*	waveLength;
 		Fl_Value_Slider*	amplitude;
 		Fl_Button*			rain;		
+
+		Fl_Button*          pixelation;
+
 		Fl_Button*			testButton;
 		Fl_Value_Slider*	testSlider;
 		// we have other widgets as part of the sample solution
