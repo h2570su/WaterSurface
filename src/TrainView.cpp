@@ -188,6 +188,7 @@ bool fileExists(const std::string& path) {
 // * this is the code that actually draws the window
 //   it puts a lot of the work into other routines to simplify things
 //========================================================================
+
 void TrainView::draw()
 {
 
@@ -256,32 +257,57 @@ void TrainView::draw()
 
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
+
+
 			glGenTextures(1, &reflectTexture);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, reflectTexture);
+			glBindTexture(GL_TEXTURE_2D, reflectTexture);
 
-			glGenFramebuffers(6, fbo);
-			glGenRenderbuffers(6, rbo);
-			for (int i = 0; i < 6; i++)
-			{
+			glGenFramebuffers(1, &reflectFBO);
+			glGenRenderbuffers(1, &reflectRBO);
 
-				glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+			glBindFramebuffer(GL_FRAMEBUFFER, reflectFBO);
 
 
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, this->pixel_w(), this->pixel_h(), 0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, this->pixel_w(), this->pixel_h(), 0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
-				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, reflectTexture, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, reflectTexture, 0);
 
-				glBindRenderbuffer(GL_RENDERBUFFER, rbo[i]);
-				glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, this->pixel_w(), this->pixel_h());
-				glBindRenderbuffer(GL_RENDERBUFFER, 0);
-				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo[i]);
+			glBindRenderbuffer(GL_RENDERBUFFER, reflectRBO);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, this->pixel_w(), this->pixel_h());
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, reflectRBO);
 
-				glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			}
-			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenTextures(1, &refractTexture);
+			glBindTexture(GL_TEXTURE_2D, refractTexture);
+
+			glGenFramebuffers(1, &refractFBO);
+			glGenRenderbuffers(1, &refractRBO);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, refractFBO);
+
+
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, this->pixel_w(), this->pixel_h(), 0.1, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, refractTexture, 0);
+
+			glBindRenderbuffer(GL_RENDERBUFFER, refractRBO);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, this->pixel_w(), this->pixel_h());
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, refractRBO);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
 
 
 			glGenFramebuffers(1, &this->pickSurfaceBuffer);
@@ -357,63 +383,63 @@ void TrainView::draw()
 			this->background = new TextureCube(paths);
 		}
 
-		if (!this->device) {
-			//Tutorial: https://ffainelli.github.io/openal-example/
-			this->device = alcOpenDevice(NULL);
-			if (!this->device)
-				puts("ERROR::NO_AUDIO_DEVICE");
+		//if (!this->device) {
+		//	//Tutorial: https://ffainelli.github.io/openal-example/
+		//	this->device = alcOpenDevice(NULL);
+		//	if (!this->device)
+		//		puts("ERROR::NO_AUDIO_DEVICE");
 
-			ALboolean enumeration = alcIsExtensionPresent(NULL, "ALC_ENUMERATION_EXT");
-			if (enumeration == AL_FALSE)
-				puts("Enumeration not supported");
-			else
-				puts("Enumeration supported");
+		//	ALboolean enumeration = alcIsExtensionPresent(NULL, "ALC_ENUMERATION_EXT");
+		//	if (enumeration == AL_FALSE)
+		//		puts("Enumeration not supported");
+		//	else
+		//		puts("Enumeration supported");
 
-			this->context = alcCreateContext(this->device, NULL);
-			if (!alcMakeContextCurrent(context))
-				puts("Failed to make context current");
+		//	this->context = alcCreateContext(this->device, NULL);
+		//	if (!alcMakeContextCurrent(context))
+		//		puts("Failed to make context current");
 
-			this->source_pos = glm::vec3(0.0f, 5.0f, 0.0f);
+		//	this->source_pos = glm::vec3(0.0f, 5.0f, 0.0f);
 
-			ALfloat listenerOri[] = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f };
-			alListener3f(AL_POSITION, source_pos.x, source_pos.y, source_pos.z);
-			alListener3f(AL_VELOCITY, 0, 0, 0);
-			alListenerfv(AL_ORIENTATION, listenerOri);
+		//	ALfloat listenerOri[] = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f };
+		//	alListener3f(AL_POSITION, source_pos.x, source_pos.y, source_pos.z);
+		//	alListener3f(AL_VELOCITY, 0, 0, 0);
+		//	alListenerfv(AL_ORIENTATION, listenerOri);
 
-			alGenSources((ALuint)1, &this->source);
-			alSourcef(this->source, AL_PITCH, 1);
-			alSourcef(this->source, AL_GAIN, 1.0f);
-			alSource3f(this->source, AL_POSITION, source_pos.x, source_pos.y, source_pos.z);
-			alSource3f(this->source, AL_VELOCITY, 0, 0, 0);
-			alSourcei(this->source, AL_LOOPING, AL_TRUE);
+		//	alGenSources((ALuint)1, &this->source);
+		//	alSourcef(this->source, AL_PITCH, 1);
+		//	alSourcef(this->source, AL_GAIN, 1.0f);
+		//	alSource3f(this->source, AL_POSITION, source_pos.x, source_pos.y, source_pos.z);
+		//	alSource3f(this->source, AL_VELOCITY, 0, 0, 0);
+		//	alSourcei(this->source, AL_LOOPING, AL_TRUE);
 
-			alGenBuffers((ALuint)1, &this->buffer);
+		//	alGenBuffers((ALuint)1, &this->buffer);
 
-			ALsizei size, freq;
-			ALenum format;
-			ALvoid* data;
-			ALboolean loop = AL_TRUE;
+		//	ALsizei size, freq;
+		//	ALenum format;
+		//	ALvoid* data;
+		//	ALboolean loop = AL_TRUE;
 
-			//Material from: ThinMatrix
-			alutLoadWAVFile((ALbyte*)"../WaterSurface/Audios/bounce.wav", &format, &data, &size, &freq, &loop);
-			alBufferData(this->buffer, format, data, size, freq);
-			alSourcei(this->source, AL_BUFFER, this->buffer);
+		//	//Material from: ThinMatrix
+		//	alutLoadWAVFile((ALbyte*)"../WaterSurface/Audios/bounce.wav", &format, &data, &size, &freq, &loop);
+		//	alBufferData(this->buffer, format, data, size, freq);
+		//	alSourcei(this->source, AL_BUFFER, this->buffer);
 
-			if (format == AL_FORMAT_STEREO16 || format == AL_FORMAT_STEREO8)
-				puts("TYPE::STEREO");
-			else if (format == AL_FORMAT_MONO16 || format == AL_FORMAT_MONO8)
-				puts("TYPE::MONO");
+		//	if (format == AL_FORMAT_STEREO16 || format == AL_FORMAT_STEREO8)
+		//		puts("TYPE::STEREO");
+		//	else if (format == AL_FORMAT_MONO16 || format == AL_FORMAT_MONO8)
+		//		puts("TYPE::MONO");
 
-			alSourcePlay(this->source);
+		//	alSourcePlay(this->source);
 
-			// cleanup context
-			//alDeleteSources(1, &source);
-			//alDeleteBuffers(1, &buffer);
-			//device = alcGetContextsDevice(context);
-			//alcMakeContextCurrent(NULL);
-			//alcDestroyContext(context);
-			//alcCloseDevice(device);
-		}
+		//	// cleanup context
+		//	//alDeleteSources(1, &source);
+		//	//alDeleteBuffers(1, &buffer);
+		//	//device = alcGetContextsDevice(context);
+		//	//alcMakeContextCurrent(NULL);
+		//	//alcDestroyContext(context);
+		//	//alcCloseDevice(device);
+		//}
 
 	}
 	else
@@ -492,17 +518,17 @@ void TrainView::draw()
 
 
 
-	// set linstener position 
-	if (selectedCube >= 0)
-		alListener3f(AL_POSITION,
-			m_pTrack->points[selectedCube].pos.x,
-			m_pTrack->points[selectedCube].pos.y,
-			m_pTrack->points[selectedCube].pos.z);
-	else
-		alListener3f(AL_POSITION,
-			this->source_pos.x,
-			this->source_pos.y,
-			this->source_pos.z);
+	//// set linstener position 
+	//if (selectedCube >= 0)
+	//	alListener3f(AL_POSITION,
+	//		m_pTrack->points[selectedCube].pos.x,
+	//		m_pTrack->points[selectedCube].pos.y,
+	//		m_pTrack->points[selectedCube].pos.z);
+	//else
+	//	alListener3f(AL_POSITION,
+	//		this->source_pos.x,
+	//		this->source_pos.y,
+	//		this->source_pos.z);
 
 #pragma endregion
 	//*********************************************************************
@@ -593,78 +619,113 @@ void TrainView::draw()
 #pragma endregion
 
 
-	this->simpleShaderDraw();
+	this->simpleShaderDraw(false);
 
-
-#pragma region disposed
-
-
-
-	//glm::vec4 _plane = glm::vec4(0, 1, 0, glm::dot(glm::vec3(0, 1, 0), glm::vec3(0, 0, 0)));
-	//glm::mat4 reflectMat;
-	//reflectMat[0][0] = -2 * _plane.x*_plane.x + 1;
-	//reflectMat[0][1] = -2 * _plane.x * _plane.y;
-	//reflectMat[0][2] = -2 * _plane.x * _plane.z;
-	//reflectMat[0][3] = -2 * _plane.x * _plane.w;
-
-	//reflectMat[1][0] = -2 * _plane.x * _plane.y;
-	//reflectMat[1][1] = -2 * _plane.y * _plane.y + 1;
-	//reflectMat[1][2] = -2 * _plane.y * _plane.z;
-	//reflectMat[1][3] = -2 * _plane.y * _plane.w;
-
-	//reflectMat[2][0] = -2 * _plane.z * _plane.x;
-	//reflectMat[2][1] = -2 * _plane.z * _plane.y;
-	//reflectMat[2][2] = -2 * _plane.z * _plane.z + 1;
-
-	//reflectMat[3][0] = 0; reflectMat[3][1] = 0;
-	//reflectMat[3][2] = 0; reflectMat[3][3] = 1;
-	//
-	//float ang = atan2f(this->arcball.getEyePos().x, this->arcball.getEyePos().z);
-	//if (ang < 0)
-	//{
-	//	ang += 2 * 3.1415926;
-	//}
-	//std::cout << glm::degrees(ang)<<std::endl;
-
-	//glm::mat4 reflectCam;	
-	//glGetFloatv(GL_MODELVIEW_MATRIX, &reflectCam[0][0]);	
-	//reflectCam = ( reflectCam * glm::transpose(reflectMat));; //TODO wait for vaild
-	//glm::rotate(reflectCam, ang, glm::vec3(reflectCam[0], reflectCam[4], reflectCam[8]));
-
-
-	//auto CamPrime = glm::reflect(this->arcball.getEyePos(), glm::vec3(0, 1, 0));
-
-	//reflectCam = glm::lookAt(CamPrime, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-#pragma endregion
-	std::vector<glm::mat4> camMats =
+	if (true)
 	{
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(100, 0, 0), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-100, 0, 0), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 100, 0), glm::vec3(0, 0, 1)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, -100, 0), glm::vec3(0, 0, -1)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 0, 100), glm::vec3(0, -1, 0)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0, 0, -100), glm::vec3(0, -1, 0))
+		glm::vec3 p0 = glm::vec3(-200, 0, 200);
+		glm::vec3 n = glm::vec3(0, 1, 0);
 
-	};
+		float mA = n.x;
+		float mB = n.y;
+		float mC = n.z;
+		float mD = -n.x*p0.x - n.y*p0.y - n.z*p0.z;;
+		glm::mat4 reflectMat;
+		reflectMat[0][0] = -2 * n.x*n.x + 1;
+		reflectMat[0][1] = -2 * n.x * n.y;
+		reflectMat[0][2] = -2 * n.x * n.z;
+		reflectMat[0][3] = -2 * n.x * mD;
 
-	glm::mat4 _projection_matrix = glm::perspective<float>(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
-	//glGetFloatv(GL_PROJECTION_MATRIX, &_projection_matrix[0][0]);
-	for (int i = 0; i < camMats.size(); i++)
-	{
+		reflectMat[1][0] = -2 * n.x * n.y;
+		reflectMat[1][1] = -2 * n.y * n.y + 1;
+		reflectMat[1][2] = -2 * n.y * n.z;
+		reflectMat[1][3] = -2 * n.y * mD;
 
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+		reflectMat[2][0] = -2 * n.z * n.x;
+		reflectMat[2][1] = -2 * n.z * n.y;
+		reflectMat[2][2] = -2 * n.z * n.z + 1;
+		reflectMat[2][3] = -2 * n.z * mD;
+
+		reflectMat[3][0] = 0;
+		reflectMat[3][1] = 0;
+		reflectMat[3][2] = 0;
+		reflectMat[3][3] = 1;
+
+
+		glm::mat4 viewMat;
+		glGetFloatv(GL_MODELVIEW_MATRIX, &viewMat[0][0]);
+		glm::mat4 viewPrime = viewMat * reflectMat;
+		glm::mat4 projection_matrix;
+		glGetFloatv(GL_PROJECTION_MATRIX, &projection_matrix[0][0]);
+		float fov = 2.0*atan(1.0 / projection_matrix[1][1]) * 180.0 / 3.1415926;
+		projection_matrix = glm::perspective<float>(glm::radians(fov), 1.0f, 0.01, 1000.0f);
+		glm::mat4 _projection_matrix = projection_matrix;
+		glm::vec4 newClipPlane = glm::transpose(glm::inverse(viewPrime))*glm::vec4(n, mD);
+		glm::vec4 q = glm::vec4((glm::sign(newClipPlane.x) + _projection_matrix[2][0]) / _projection_matrix[0][0],
+			(glm::sign(newClipPlane.y) + _projection_matrix[2][1]) / _projection_matrix[1][1],
+			-1.0f, (1.0f + _projection_matrix[2][2]) / _projection_matrix[3][2]);
+		glm::vec4 c = newClipPlane * (2.0f / glm::dot(newClipPlane, q));
+		_projection_matrix[0][2] = c.x;
+		_projection_matrix[1][2] = c.y;
+		_projection_matrix[2][2] = c.z + 1.0f;
+		_projection_matrix[3][2] = c.w;
+
+
+
+
+		glBindFramebuffer(GL_FRAMEBUFFER, reflectFBO);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glEnable(GL_DEPTH_TEST);
-		//camMats[i] = glm::scale(glm::vec3()) camMats[i]
-		setViewAndProjToUBO(camMats[i], _projection_matrix);
-		glBindBufferRange(
-			GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
-		this->drawBackground(camMats[i], _projection_matrix);
+
 		this->simpleShader->Use();
-		this->simpleShaderDraw();
+
+		setViewAndProjToUBO(viewPrime, _projection_matrix);
+		this->drawBackground(viewPrime, projection_matrix);
+		this->simpleShader->Use();
+		this->simpleShaderDraw(true);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+	if (true)
+	{
+		glm::vec3 campos = this->arcball.getEyePos();
+		float len = sqrt(campos.x*campos.x + campos.y*campos.y + campos.z*campos.z);
+
+		glm::vec3 p0 = glm::vec3(-200, 0, 200);
+		glm::vec3 n = glm::vec3(0, 1, 0);
+
+		float mA = n.x;
+		float mB = n.y;
+		float mC = n.z;
+		float mD = -n.x*p0.x - n.y*p0.y - n.z*p0.z;;
+
+		glm::mat4 viewMat;
+		glGetFloatv(GL_MODELVIEW_MATRIX, &viewMat[0][0]);
+		glm::mat4 viewPrime = viewMat * glm::scale(glm::vec3(1, glm::clamp(1.0f - (0.3f), 0.001f, 1.0f), 1));
+		glm::mat4 projection_matrix;
+		glGetFloatv(GL_PROJECTION_MATRIX, &projection_matrix[0][0]);
+		float fov = 2.0*atan(1.0 / projection_matrix[1][1]) * 180.0 / 3.1415926;
+		projection_matrix = glm::perspective<float>(glm::radians(fov), 1.0f, 0.01, 1000.0f);
+		
+		glm::vec4 newClipPlane = glm::transpose(glm::inverse(viewPrime))*glm::vec4(n, mD);
+		glm::mat4 _projection_matrix = projection_matrix;
+		(&_projection_matrix[0][0])[2] = newClipPlane.x + (&_projection_matrix[0][0])[3];//x
+        (&_projection_matrix[0][0])[6] = newClipPlane.y + (&_projection_matrix[0][0])[7];//y
+        (&_projection_matrix[0][0])[10] = newClipPlane.z + (&_projection_matrix[0][0])[11];//z
+        (&_projection_matrix[0][0])[14] = newClipPlane.w + (&_projection_matrix[0][0])[15];//w
+
+		glBindFramebuffer(GL_FRAMEBUFFER, refractFBO);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		this->simpleShader->Use();
+
+		setViewAndProjToUBO(viewPrime, _projection_matrix);
+		this->drawBackground(viewPrime, projection_matrix);
+		this->simpleShader->Use();
+		this->simpleShaderDraw(false);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
 
 
@@ -674,12 +735,18 @@ void TrainView::draw()
 	setViewAndProjToUBO();
 	glBindBufferRange(
 		GL_UNIFORM_BUFFER, /*binding point*/0, this->commom_matrices->ubo, 0, this->commom_matrices->size);
-	glActiveTexture(GL_TEXTURE0 + 11);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, this->reflectTexture);
+	glActiveTexture(GL_TEXTURE11);
+	glBindTexture(GL_TEXTURE_2D, this->refractTexture);
+
+	glActiveTexture(GL_TEXTURE12);
+	glBindTexture(GL_TEXTURE_2D, this->reflectTexture);
 	this->drawSurface();
 
-	glActiveTexture(GL_TEXTURE0 + 11);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	glActiveTexture(GL_TEXTURE11);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glActiveTexture(GL_TEXTURE12);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	//unbind shader(switch to fixed pipeline)
 
 
@@ -694,10 +761,19 @@ void TrainView::draw()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, this->frameTexture);
 	this->postProcessShader->setInt("u_frame", 0);
+	this->postProcessShader->setFloat("u_time", this->m_pTrack->trainU);
 	GLuint effects = 0;
 	if (this->tw->pixelation->value())
 	{
 		effects |= 0x01;
+	}
+	if (this->tw->offset->value())
+	{
+		effects |= 0x02;
+	}
+	if (this->tw->rotate->value())
+	{
+		effects |= 0x04;
 	}
 	this->postProcessShader->setInt("u_effect", effects);
 	if (true)
@@ -711,7 +787,7 @@ void TrainView::draw()
 
 }
 
-void TrainView::simpleShaderDraw()
+void TrainView::simpleShaderDraw(bool reverse)
 {
 	//aPlane
 	glm::mat4 model_matrix = glm::mat4();
@@ -759,7 +835,14 @@ void TrainView::simpleShaderDraw()
 	if (true)
 	{
 		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
+		if (!reverse)
+		{
+			glCullFace(GL_BACK);
+		}
+		else
+		{
+			glCullFace(GL_FRONT);
+		}
 		glFrontFace(GL_CCW);
 		glm::mat4 model_matrix = glm::mat4();
 		model_matrix = glm::scale(model_matrix, glm::vec3(200.0f, 100.0f, 1.0f));
@@ -886,7 +969,7 @@ void TrainView::drawSurface()
 	this->surfaceShader->setFloat("u_time", this->m_pTrack->trainU);
 	this->surfaceShader->setFloat("u_wavelength", this->tw->waveLength->value());
 	this->surfaceShader->setFloat("u_amplitude", this->tw->amplitude->value());
-	this->surfaceShader->setBool("u_testNormal", this->tw->testButton->value());
+	this->surfaceShader->setBool("u_realTimeRender", this->tw->realTimeRender->value());
 
 	if (this->tw->waveBrowser->selected(2))
 	{
@@ -915,7 +998,9 @@ void TrainView::drawSurface()
 	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_skybox"), 10);
 
 
-	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_renderbox"), 11);
+	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_refractTexture"), 11);
+
+	glUniform1i(glGetUniformLocation(this->surfaceShader->Program, "u_reflectTexture"), 12);
 
 	int dropIdx = 0;
 	for (auto& v : this->drops)
@@ -938,7 +1023,7 @@ void TrainView::drawSurface()
 	glm::mat4 model_matrix = glm::mat4();
 	model_matrix = glm::scale(model_matrix, glm::vec3(1.0f, 10.0f, 1.0f));
 	glUniformMatrix4fv(glGetUniformLocation(this->surfaceShader->Program, "u_model"), 1, GL_FALSE, &model_matrix[0][0]);
-	this->texture->bind(0);
+	//this->texture->bind(0);
 
 	this->surfaceShader->setBool("u_useTexture", false);
 	this->waterSurface.draw(this->surfaceShader, model_matrix);
@@ -1025,7 +1110,7 @@ setProjection()
 		else {
 			he = 110;
 			wi = he * aspect;
-	}
+		}
 
 		// Set up the top camera drop mode to be orthogonal and set
 		// up proper projection matrix
@@ -1034,7 +1119,7 @@ setProjection()
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		glRotatef(-90, 1, 0, 0);
-}
+	}
 	// Or do the train view or other view here
 	//####################################################################
 	// TODO: 
@@ -1073,8 +1158,8 @@ void TrainView::drawStuff(bool doingShadows)
 					glColor3ub(240, 240, 30);
 			}
 			m_pTrack->points[i].draw();
+			}
 		}
-	}
 	// draw the track
 	//####################################################################
 	// TODO: 
@@ -1095,7 +1180,7 @@ void TrainView::drawStuff(bool doingShadows)
 	if (!tw->trainCam->value())
 		drawTrain(this, doingShadows);
 #endif
-			}
+	}
 
 // 
 //************************************************************************
@@ -1185,7 +1270,7 @@ doPick()
 			std::cout << "Selecting: " + std::to_string(picker.x) + ", " + std::to_string(picker.y) << std::endl;
 			this->drops[this->m_pTrack->trainU] = glm::vec2(picker.x, picker.y);
 		}
-		
+
 
 	}
 

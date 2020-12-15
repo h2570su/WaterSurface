@@ -118,13 +118,14 @@ TrainWindow(const int x, const int y)
 		// browser to select spline types
 		// TODO: make sure these choices are the same as what the code supports
 		shadingBrowser = new Fl_Browser(605, pty, 90, 75, "Shading Type");
-		shadingBrowser->type(2);		// select
+		shadingBrowser->type(0);		// select
 		shadingBrowser->callback((Fl_Callback*)damageCB, this);
 		shadingBrowser->add("None");
 		shadingBrowser->add("Phong");
 		shadingBrowser->add("Smooth");
 		shadingBrowser->add("Toon");
 		shadingBrowser->select(2);
+		
 
 		waveBrowser = new Fl_Browser(700, pty, 90, 75, "Wave Type");
 		waveBrowser->type(2);		// select
@@ -146,18 +147,19 @@ TrainWindow(const int x, const int y)
 		togglify(pixelation);
 		pixelation->callback((Fl_Callback*)damageCB, this);
 
-		pty += 30;
-		testButton = new Fl_Button(605, pty, 30, 20, "Test");
-		togglify(testButton);
-		testButton->callback((Fl_Callback*)damageCB, this);
+		offset = new Fl_Button(670, pty, 60, 20, "Offset");
+		togglify(offset);
+		offset->callback((Fl_Callback*)damageCB, this);
+
+		rotate = new Fl_Button(735, pty, 60, 20, "Rotate");
+		togglify(rotate);
+		rotate->callback((Fl_Callback*)damageCB, this);
 
 		pty += 30;
-		testSlider = new Fl_Value_Slider(655, pty, 140, 20, "Tset");
-		testSlider->range(1, 180);
-		testSlider->value(90);
-		testSlider->align(FL_ALIGN_LEFT);
-		testSlider->type(FL_HORIZONTAL);
-		testSlider->callback((Fl_Callback*)damageCB, this);
+		realTimeRender = new Fl_Button(605, pty, 150, 20, "RealTimeRender");
+		togglify(realTimeRender);
+		realTimeRender->callback((Fl_Callback*)damageCB, this);
+
 		// TODO: add widgets for all of your fancier features here
 #ifdef EXAMPLE_SOLUTION
 		makeExampleWidgets(this, pty);

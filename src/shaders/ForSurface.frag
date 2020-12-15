@@ -6,6 +6,7 @@ in vec3 f_in_position;
 in vec3 f_in_normal;
 in vec2 f_in_texture_coordinate;
 in vec3 f_in_color;
+in vec4 f_in_screenCoord;
 
 uniform vec3 u_viewer_pos;
 uniform int u_shadingSelect;
@@ -49,10 +50,10 @@ uniform PointLight pointLights[NR_POINT_LIGHTS];
 uniform  SpotLight spotLights[NR_SPOT_LIGHTS];
 
 uniform bool u_useTexture;
-uniform sampler2D u_texture;
+uniform sampler2D u_reflectTexture;
+uniform sampler2D u_refractTexture;
 uniform samplerCube u_skybox;
-uniform samplerCube u_renderbox;
-uniform bool u_testNormal;
+uniform bool u_realTimeRender;
 
 const float toonStage=3.0;
 
@@ -148,7 +149,7 @@ void main()
 	
 	if(u_useTexture)
 	{    
-		 sourceColor = vec3(texture(u_texture, f_in_texture_coordinate));
+		 sourceColor = vec3(texture(u_reflectTexture, f_in_texture_coordinate));
 		
 	}
 	else
@@ -182,29 +183,26 @@ void main()
 		}
 		vec4 baseColor = vec4(result, 1);
 
-		if(u_testNormal)
+		if(u_realTimeRender)
 		{
+			
 			float _FresnelBase = 0.0;
-			float _FresnelScale = 5.0;
-			float _FresnelPower = 2.0;
-			vec4 reflectColor = texture(u_renderbox, reflect(-viewDir, _normal));
-			vec4 refractColor ;
+			float _FresnelScale = 10.0;
+			float _FresnelPower = 6.0;
+			vec4 reflectColor = texture(u_reflectTexture, f_in_screenCoord.xy/f_in_screenCoord.w+(f_in_position.y/20));
+			vec4 refractColor = texture(u_refractTexture, f_in_screenCoord.xy/f_in_screenCoord.w+(f_in_position.y/20));
 			float fresnel = 0.0;
-			if((-viewDir).y>0)
-			{
-				refractColor = texture(u_renderbox, refract(viewDir, _normal,1.0/1.33));
-				fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(-_normal, -viewDir), _FresnelPower), 0.0, 1.0);
-
+			if((-viewDir).y<0)
+			{				
+				fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(_normal, viewDir), _FresnelPower), 0.0, 1.0);
 			}
 			else
-			{
-				refractColor = texture(u_renderbox, refract(viewDir, -_normal,1.0/1.33));
-			    fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(_normal, -viewDir), _FresnelPower), 0.0, 1.0);
-
+			{				
+			    fresnel = clamp( _FresnelBase + _FresnelScale * pow(1 - dot(-_normal, viewDir), _FresnelPower), 0.0, 1.0);
 			}
-			fresnel =1;
+			//fresnel =0;
 			f_color = refractColor*(1-fresnel)+reflectColor*fresnel;
-			
+			f_color = baseColor*0.3+f_color*0.7;
 		}
 		else
 		{

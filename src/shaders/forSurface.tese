@@ -11,6 +11,7 @@ out vec3 f_in_position;
 out vec3 f_in_normal;
 out vec2 f_in_texture_coordinate;
 out vec3 f_in_color;
+out vec4 f_in_screenCoord;
 
 uniform vec2 u_direction;
 uniform float u_time;
@@ -18,7 +19,7 @@ uniform float u_wavelength;
 uniform float u_amplitude;
 uniform int u_waveSelect;
 uniform highp sampler2D u_heightmap;
-uniform bool u_testNormal;
+uniform bool u_realTimeRender;
 
 #define MAX_DROPS 100
 
@@ -143,4 +144,8 @@ void main()
 
     //f_in_color = interpolate3D(e_in_color[0], e_in_color[1],e_in_color[2]);
 	gl_Position =u_projection*u_view*vec4(f_in_position,1.0);
+	vec4 o = gl_Position;
+	o = o*0.5;
+	f_in_screenCoord.xy = o.xy+o.w;
+	f_in_screenCoord.zw = o.zw*2;
 }

@@ -94,8 +94,10 @@ class TrainWindow : public Fl_Double_Window {
 		Fl_Button*			rain;		
 
 		Fl_Button*          pixelation;
+		Fl_Button*          offset;
+		Fl_Button*          rotate;
 
-		Fl_Button*			testButton;
+		Fl_Button*			realTimeRender;
 		Fl_Value_Slider*	testSlider;
 		// we have other widgets as part of the sample solution
 		// this is not for 559 students to know about

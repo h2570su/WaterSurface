@@ -75,7 +75,7 @@ class TrainView : public Fl_Gl_Window
 		virtual int handle(int);
 		virtual void draw();
 
-		void simpleShaderDraw();
+		void simpleShaderDraw(bool reverse = false);
 
 		void drawSurface();
 
@@ -130,9 +130,14 @@ class TrainView : public Fl_Gl_Window
 		Texture2D* tile	= nullptr;
 
 		TextureCube* background	= nullptr;
-		GLuint fbo[6];
-		GLuint rbo[6];
+
+		GLuint reflectFBO;
+		GLuint reflectRBO;
 		GLuint reflectTexture;
+
+		GLuint refractFBO;
+		GLuint refractRBO;
+		GLuint refractTexture;
 
 		GLuint pickSurfaceBuffer;
 		GLuint pickSurfaceRenderBuffer;
